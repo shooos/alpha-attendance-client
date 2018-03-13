@@ -4,8 +4,13 @@ const xhr = new XMLHttpRequest();
 xhr.onload = () => {
   statusWindow = xhr.responseXML.getElementById('alpha-attendance-client-status-window');
   const footer = document.getElementsByClassName('footer')[0];
+  const frameset = document.getElementsByTagName('frameset')[0];
+
   if (footer != null) {
     document.body.insertBefore(statusWindow, footer);
+  } else if (frameset != null) {
+    const html = document.getElementsByTagName('html')[0];
+    html.insertBefore(statusWindow, frameset);
   }
 };
 const url = chrome.extension.getURL('/status-window.html');
@@ -22,7 +27,6 @@ const empty = (node) => {
 }
 
 chrome.runtime.onMessage.addListener((message) => {
-  console.log(message);
   if (statusWindow != null) {
     const user = document.getElementById('alpha-attendance-client-user');
     if (user != null) {
