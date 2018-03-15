@@ -1,0 +1,39 @@
+body {
+  background-color: #d9f5e8;
+  width: 250px;
+  min-height: 100px;
+  font-size: 14px;
+}
+
+label {
+  user-select: none;
+}
+
+body > div {
+  margin: 5px 0;
+  width: 100%;
+}
+
+#user {
+  background: white;
+  border: 1px solid gray;
+  border-radius: 3px;
+  height: 28px;
+  padding: 0 8px;
+  width: 80px;
+}
+
+#message {
+  background: rgba(220, 220, 220, .3);;
+  resize: none;
+  width: 100%;
+  border: 2px dashed #acacac;
+  box-sizing: border-box;
+  padding: 5px;
+  font-family: unset;
+}
+
+#message:focus {
+  outline-offset: 0;
+  outline: none;
+}
