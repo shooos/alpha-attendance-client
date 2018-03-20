@@ -1,5 +1,6 @@
-const form = document.forms[0];
-if (form != null) {
+const funcs = {};
+
+funcs.loginForm = (form) => {
   const elements = form.elements;
   let userIDForm, passwordForm;
 
@@ -24,4 +25,17 @@ if (form != null) {
       passwordForm = element;
     }
   }
+}
+
+funcs.mainContent = (frame) => {
+
+}
+
+const form = document.forms['login/loginForm'];
+const contentFrame = document.getElementById('contentFrame');
+
+if (form) {
+  funcs.loginForm(form);
+} else if (contentFrame) {
+  funcs.mainContent(contentFrame);
 }
