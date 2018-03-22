@@ -33,9 +33,18 @@ funcs.loginForm = (form) => {
 
 funcs.mainContent = (view, menu) => {
   view.frameElement.addEventListener('load', (e) => {
-    const title = e.target.contentWindow.document.title;
+    const doc = e.target.contentWindow.document;
+    const title = doc.title;
     if (title.startsWith('勤務表')) {
-      console.log('勤務表');
+      // 勤務表ページ
+      let table;
+      for (let child of doc.body.childNodes) {
+        if (child.textContent === '週／月切替') {
+          table = child.nextSibling;
+          break;
+        }
+      }
+
     }
   });
 }
