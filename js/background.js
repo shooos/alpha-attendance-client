@@ -35,8 +35,8 @@ actions.login = async (sender, args) => {
     url.push(host + ':' + port);
     url.push('alpha/user/login');
     const data = {
-      user: args.id,
-      password: args.password, // TODO: Hash化する
+      id: args.id,
+      password: args.password,
     };
     const response = await request.post(url.join('/'), data).catch((err) => {
       // エラーだったとき

@@ -9,11 +9,15 @@ funcs.loginForm = (form) => {
 
     if (type === 'submit') {
       element.addEventListener('mousedown', () => {
+        const utf8arr = CryptoJS.enc.Utf8.parse(passwordForm.value);
+        const hash = CryptoJS.SHA256(utf8arr);
+        const passwordHash = CryptoJS.enc.Base64.stringify(hash);
+
         chrome.runtime.sendMessage({
           action: 'login',
           values: {
             id: userIDForm.value,
-            password: passwordForm.value,
+            password: passwordHash,
           },
         });
       });
@@ -27,15 +31,17 @@ funcs.loginForm = (form) => {
   }
 }
 
-funcs.mainContent = (frame) => {
-
+funcs.mainContent = (view) => {
+  view.onload = () => {
+    console.log('onload');
+  }
 }
 
 const form = document.forms['login/loginForm'];
-const contentFrame = document.getElementById('contentFrame');
+const mainView = parent.view;
 
 if (form) {
   funcs.loginForm(form);
-} else if (contentFrame) {
-  funcs.mainContent(contentFrame);
+} else if (mainView) {
+  funcs.mainContent(mainView);
 }
