@@ -31,17 +31,21 @@ funcs.loginForm = (form) => {
   }
 }
 
-funcs.mainContent = (view) => {
-  view.onload = () => {
-    console.log('onload');
-  }
+funcs.mainContent = (view, menu) => {
+  view.frameElement.addEventListener('load', (e) => {
+    const title = e.target.contentWindow.document.title;
+    if (title.startsWith('勤務表')) {
+      console.log('勤務表');
+    }
+  });
 }
 
 const form = document.forms['login/loginForm'];
-const mainView = parent.view;
+const mainFrame = parent.view;
+const menuFrame = parent.menu;
 
 if (form) {
   funcs.loginForm(form);
-} else if (mainView) {
-  funcs.mainContent(mainView);
+} else if (mainFrame && menuFrame) {
+  funcs.mainContent(mainFrame, menuFrame);
 }
