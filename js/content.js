@@ -1,3 +1,4 @@
+let baseUrl;
 const funcs = {};
 
 funcs.loginForm = (form) => {
@@ -43,6 +44,14 @@ funcs.mainContent = (view, menu) => {
   view.frameElement.addEventListener('load', (e) => {
     const doc = e.target.contentWindow.document;
     const title = doc.title;
+
+    // STYLEを埋め込み
+    const link = doc.createElement('link');
+    link.setAttribute('rel', 'stylesheet');
+    link.setAttribute('type', 'text/css');
+    link.setAttribute('href', [baseUrl, 'css/attendance.css'].join('/'));
+    doc.head.appendChild(link);
+
     if (title.startsWith('勤務表')) {
       // 勤務表ページ
 
@@ -73,10 +82,14 @@ funcs.mainContent = (view, menu) => {
           header: '形態（予定）',
           name: 'pattern',
           innerTag: (row) => {
-            const tag = doc.createElement('select');
-            tag.classList.add('alpha-attendance-select-pattern');
+            let tag;
             if (isReadonly(viewState, row, now)) {
+              tag = doc.createElement('input');
+              tag.classList.add('alpha-attendance-display-pattern');
               tag.setAttribute('readonly', 'readonly');
+            } else {
+              tag = doc.createElement('select');
+              tag.classList.add('alpha-attendance-select-pattern');
             }
             return tag;
           },
@@ -148,6 +161,21 @@ if (form) {
 } else if (mainFrame && menuFrame) {
   funcs.mainContent(mainFrame, menuFrame);
 }
+
+chrome.storage.sync.get({
+  ssl: false,
+  host: '',
+  port: 3000,
+}, (items) => {
+  const host = items.host;
+  const port = items.port;
+  if (!host) return;
+
+  const url = [];
+  url.push(items.ssl ? 'https:/' : 'http:/');
+  url.push(host + ':' + port);
+  baseUrl = url.join('/');
+});
 
 const isReadonly = (viewState, row, now) => {
   if (viewState === 'FUTURE') return false;
