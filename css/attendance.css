@@ -1,0 +1,13 @@
+table.alpha-attendance-table {
+  font-size: 16px;
+  border-collapse: collapse;
+  border: 2px solid inherit;
+}
+
+table.alpha-attendance-table th {
+  background: #aaa;
+}
+
+table.alpha-attendance-table td {
+  background: #eee;
+}
