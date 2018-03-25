@@ -41,6 +41,14 @@ funcs.mainContent = (view, menu) => {
     day: n.getDate(),
   };
 
+  // 勤務形態リストを取得する
+  chrome.runtime.sendMessage({
+    action: 'getPatterns',
+    values: {},
+  }, (response) => {
+    console.log('callback: ', response);
+  });
+
   view.frameElement.addEventListener('load', (e) => {
     const doc = e.target.contentWindow.document;
     const title = doc.title;
