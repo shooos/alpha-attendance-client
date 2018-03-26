@@ -1,0 +1,22 @@
+.alpha-attendance-button-register {
+  padding: 10px;
+  color: #fff;
+  border-radius: 4px;
+  box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4);
+  display: inline-block;
+  font-size: 14px;
+  line-height: 14px;
+  cursor: pointer;
+  font-family: monospace;
+  background: #377d40;
+  user-select: none;
+}
+
+.alpha-attendance-button-register:hover {
+  background: #2b5a31;
+}
+
+.alpha-attendance-button-register:active {
+  box-shadow: none;
+  transform: translate(1px, 1px);
+}

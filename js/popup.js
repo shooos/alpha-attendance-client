@@ -24,13 +24,14 @@ chrome.storage.local.get(['user', 'status', 'message'], (items) => {
 let registerRequesting = false;
 /* ユーザ登録 */
 elements.btnRegister.addEventListener('mousedown', (e) => {
+  console.log('mousedown');
   if (registerRequesting) return;
   registerRequesting = true;
 
   chrome.storage.local.get(['user', 'password'], (items) => {
     chrome.runtime.sendMessage({
       action: 'registerUser',
-      value: {
+      values: {
         user: items.user,
         password: items.password,
       },

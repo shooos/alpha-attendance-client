@@ -83,6 +83,17 @@ actions.login = async (sender, args, baseUrl) => {
 
   chrome.storage.local.set(local);
 }
+/* 勤務形態取得 */
+actions.getWorkPattern = async (sender, args, baseUrl, callback) => {
+  chrome.storage.local.get(['token'], async (items) => {
+    const token = items.token;
+    if (!token) return;
+
+    const headers = {'authorization': 'Bearer ' + token};
+    const response = await request.get([baseUrl, 'workPattern', 'id', args.id].join('/'), {headers: headers});
+    callback(response);
+  });
+}
 /* 勤務形態リスト取得 */
 actions.getPatterns = async (sender, args, baseUrl, callback) => {
   chrome.storage.local.get(['token'], async (items) => {
@@ -105,6 +116,7 @@ actions.registerUser = async (sender, args, baseUrl, callback) => {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, callback) => {
+  console.log('onMessage', message, sender, callback);
   chrome.storage.sync.get(['ssl', 'host', 'port'], async (items) => {
     const host = items.host;
     const port = items.port;
