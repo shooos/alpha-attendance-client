@@ -67,17 +67,21 @@ actions.login = async (sender, args, baseUrl) => {
   const response = await request.post([baseUrl, 'user', 'login'].join('/'), data)
     .catch((err) => {
       popupBadge.setError();
-      local.status = 'ERROR';
-      local.message = err.message;
+      local.status = 'LoginFailed';
+      if (err.name === 'TypeError') {
+        local.message = 'Login request failed.';
+      } else {
+        local.message = err.message;
+      }
     });
 
-  if (response.error) {
+  if (response && response.error) {
     popupBadge.setError();
     local.status = response.error;
     local.message = response.message;
-  } else if (response.data) {
+  } else if (response && response.data) {
     popupBadge.setSuccess();
-    local.status = 'LOGGED-IN';
+    local.status = 'LoggedIn';
     local.token = response.data.token;
   }
 
@@ -126,7 +130,10 @@ chrome.runtime.onMessage.addListener((message, sender, callback) => {
     baseUrl.push(items.ssl ? 'https:/' : 'http:/');
     baseUrl.push(host + ':' + port);
     baseUrl.push('alpha');
-    await actions[message.action](sender, message.values, baseUrl.join('/'), callback);
+    await actions[message.action](sender, message.values, baseUrl.join('/'), callback)
+      .catch((err) => {
+        console.error(err);
+      });
   });
 
   return true;

@@ -5,24 +5,23 @@ funcs.loginForm = (form) => {
   const elements = form.elements;
   let userIDForm, passwordForm;
 
+  form.addEventListener('submit', () => {
+    const utf8arr = CryptoJS.enc.Utf8.parse(passwordForm.value);
+    const hash = CryptoJS.SHA256(utf8arr);
+    const passwordHash = CryptoJS.enc.Base64.stringify(hash);
+
+    chrome.runtime.sendMessage({
+      action: 'login',
+      values: {
+        id: userIDForm.value,
+        password: passwordHash,
+      },
+    });
+  });
+
   for (let element of elements) {
     const type = element.type;
 
-    if (type === 'submit') {
-      element.addEventListener('mousedown', () => {
-        const utf8arr = CryptoJS.enc.Utf8.parse(passwordForm.value);
-        const hash = CryptoJS.SHA256(utf8arr);
-        const passwordHash = CryptoJS.enc.Base64.stringify(hash);
-
-        chrome.runtime.sendMessage({
-          action: 'login',
-          values: {
-            id: userIDForm.value,
-            password: passwordHash,
-          },
-        });
-      });
-    }
     if (type === 'text') {
       userIDForm = element;
     }

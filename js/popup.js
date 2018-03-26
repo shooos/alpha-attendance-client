@@ -1,6 +1,7 @@
 const elements = {
   user: document.getElementById('user'),
   message: document.getElementById('message'),
+  btnLogin: document.getElementById('btn-login'),
   btnRegister: document.getElementById('btn-register'),
   btnChangePassword: document.getElementById('btn-change-password'),
 };
@@ -13,10 +14,17 @@ chrome.storage.local.get(['user', 'status', 'message'], (items) => {
   case 'MemberNotFoundError':
     elements.btnChangePassword.classList.remove('hidden');
     elements.btnRegister.classList.remove('hidden');
+    elements.message.classList.add('error');
+    break;
+  case 'LoginFailed':
+    elements.btnLogin.classList.remove('hidden');
+    elements.message.classList.add('error');
+    break;
+  case 'Error':
+    elements.message.classList.add('error');
     break;
   default:
-    elements.btnChangePassword.classList.add('hidden');
-    elements.btnRegister.classList.add('hidden');
+    elements.message.classList.remove('error');
     break;
   }
 });

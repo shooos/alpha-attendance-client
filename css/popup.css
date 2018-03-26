@@ -28,7 +28,7 @@ body > div {
 }
 
 #message {
-  background: rgba(220, 220, 220, .3);;
+  background: rgba(220, 220, 220, .3);
   resize: none;
   width: 100%;
   border: 2px dashed #acacac;
@@ -40,6 +40,10 @@ body > div {
 #message:focus {
   outline-offset: 0;
   outline: none;
+}
+
+#message.error {
+  background: #ffaeae;
 }
 
 #box-buttons {
@@ -76,4 +80,15 @@ body > div {
 
 #btn-change-password:hover {
   background: #9d449e;
+}
+
+#btn-login {
+  background: #4caf81;
+  border: 1px solid #39725a;
+  box-shadow: 0px 0px 8px 1px rgba(68, 146, 81, 0.4);
+  color: white;
+}
+
+#btn-login:hover {
+  background: #3a8663;
 }
