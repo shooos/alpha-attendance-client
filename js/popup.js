@@ -6,8 +6,12 @@ const elements = {
   btnChangePassword: document.getElementById('btn-change-password'),
 };
 
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  console.log(changes, areaName);
+});
+
 chrome.storage.local.get(['user', 'status', 'message'], (items) => {
-  elements.user.value = items.user;
+  elements.user.value = items.user || '';
   elements.message.value = items.message || 'No Message';
 
   switch (items.status) {
@@ -29,10 +33,9 @@ chrome.storage.local.get(['user', 'status', 'message'], (items) => {
   }
 });
 
-let registerRequesting = false;
 /* ユーザ登録 */
+let registerRequesting = false;
 elements.btnRegister.addEventListener('mousedown', (e) => {
-  console.log('mousedown');
   if (registerRequesting) return;
   registerRequesting = true;
 
@@ -40,14 +43,26 @@ elements.btnRegister.addEventListener('mousedown', (e) => {
     chrome.runtime.sendMessage({
       action: 'registerUser',
       values: {
-        user: items.user,
+        id: items.user,
         password: items.password,
       },
-    }, (response) => {
-      registerRequesting = false;
-      if (!response.error) {
-        elements.btnRegister.classList.remove('hidden');
-      }
+    });
+  });
+});
+
+/* ログイン */
+let loginRequesting = false;
+elements.btnLogin.addEventListener('mousedown', (e) => {
+  if (loginRequesting) return;
+  loginRequesting = true;
+
+  chrome.storage.local.get(['user', 'password'], (items) => {
+    chrome.runtime.sendMessage({
+      action: 'login',
+      values: {
+        id: items.user,
+        password: items.password,
+      },
     });
   });
 });

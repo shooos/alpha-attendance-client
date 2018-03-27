@@ -41,13 +41,35 @@ funcs.mainContent = (view, menu) => {
   };
 
   // 勤務形態リストを取得する
+  let patterns;
   chrome.runtime.sendMessage({
     action: 'getPatterns',
     values: {},
   }, (response) => {
-    console.log('callback: ', response);
+    patterns = response.data;
   });
 
+  // menu frame
+  menu.frameElement.addEventListener('load', (e) => {
+    const doc = e.target.contentWindow.document;
+
+    const logoutElement = doc.getElementsByClassName('logout')[0];
+    logoutElement.addEventListener('click', () => {
+      chrome.storage.local.get(['user'], (items) => {
+        chrome.runtime.sendMessage({
+          action: 'logout',
+          values: {
+            id: items.user
+          },
+        }, () => {
+          // Logout したら storage をクリアする
+          chrome.storage.local.clear();
+        });
+      });
+    });
+  });
+
+  // view frame
   view.frameElement.addEventListener('load', (e) => {
     const doc = e.target.contentWindow.document;
     const title = doc.title;
@@ -97,6 +119,12 @@ funcs.mainContent = (view, menu) => {
             } else {
               tag = doc.createElement('select');
               tag.classList.add('alpha-attendance-select-pattern');
+              for (let pattern of patterns) {
+                const option = doc.createElement('option');
+                option.value = pattern.workPatternId;
+                option.textContent = pattern.label || pattern.workPatternId;
+                tag.appendChild(option);
+              }
             }
             return tag;
           },

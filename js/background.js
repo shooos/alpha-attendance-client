@@ -48,11 +48,29 @@ request.post = async (url, data, options) => {
 }
 
 const actions = {};
+
+/* ユーザ登録 */
+actions.registerUser = async (sender, args, baseUrl) => {
+  const data = {
+    id: args.id,
+    password: args.password,
+  };
+  const response = await request.post([baseUrl, 'user', 'register'].join('/'), data)
+    .catch((err) => {
+      throw err;
+    });
+  if (response.err) {
+    chrome.storage.local.set({
+      status: 'RegisterUserFailed',
+      message: response.message,
+    });
+  } else {
+    await actions.login(sender, args, baseUrl, callback);
+  }
+}
+
 /* ログイン処理 */
 actions.login = async (sender, args, baseUrl) => {
-  const tab = sender.tab;
-  if (tab == null) return;
-
   const local = {
     user: args.id,
     password: args.password,
@@ -87,6 +105,25 @@ actions.login = async (sender, args, baseUrl) => {
 
   chrome.storage.local.set(local);
 }
+
+/* ログアウト */
+actions.logout = async (sender, args, baseUrl, callback) => {
+  await request.post([baseUrl, 'user', 'logout'].join('/'), {id: args.id});
+  if (callback) callback();
+}
+
+/* 勤務形態登録 */
+actions.registerWorkPattern = async (sender, args, baseUrl, callback) => {
+  chrome.storage.local.get(['token'], async (items) => {
+    const token = items.token;
+    if (!token) return;
+
+    const headers = {'authorization': 'Bearer ' + token};
+    const response = await request.post([baseUrl, 'workPattern', 'register'].join('/'), args, {headers: headers});
+    if (callback) callback(response);
+  });
+}
+
 /* 勤務形態取得 */
 actions.getWorkPattern = async (sender, args, baseUrl, callback) => {
   chrome.storage.local.get(['token'], async (items) => {
@@ -95,9 +132,10 @@ actions.getWorkPattern = async (sender, args, baseUrl, callback) => {
 
     const headers = {'authorization': 'Bearer ' + token};
     const response = await request.get([baseUrl, 'workPattern', 'id', args.id].join('/'), {headers: headers});
-    callback(response);
+    if (callback) callback(response);
   });
 }
+
 /* 勤務形態リスト取得 */
 actions.getPatterns = async (sender, args, baseUrl, callback) => {
   chrome.storage.local.get(['token'], async (items) => {
@@ -106,17 +144,8 @@ actions.getPatterns = async (sender, args, baseUrl, callback) => {
 
     const headers = {'authorization': 'Bearer ' + token};
     const response = await request.get([baseUrl, 'workPattern', 'list'].join('/'), {headers: headers});
-    callback(response);
+    if (callback) callback(response);
   });
-}
-/* ユーザ登録 */
-actions.registerUser = async (sender, args, baseUrl, callback) => {
-  const data = {
-    id: args.user,
-    password: args.password,
-  };
-  const response = await request.post([baseUrl, 'user', 'register'].join('/'), data);
-  callback(response);
 }
 
 chrome.runtime.onMessage.addListener((message, sender, callback) => {

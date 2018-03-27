@@ -1,4 +1,4 @@
-.alpha-attendance-button-register {
+.alpha-attendance-button {
   padding: 10px;
   color: #fff;
   border-radius: 4px;
@@ -12,11 +12,11 @@
   user-select: none;
 }
 
-.alpha-attendance-button-register:hover {
+.alpha-attendance-button:hover {
   background: #2b5a31;
 }
 
-.alpha-attendance-button-register:active {
+.alpha-attendance-button:active {
   box-shadow: none;
   transform: translate(1px, 1px);
 }
