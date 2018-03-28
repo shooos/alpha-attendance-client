@@ -16,6 +16,9 @@ funcs.loginForm = (form) => {
         id: userIDForm.value,
         password: passwordHash,
       },
+    }, (response) => {
+      console.log(response);
+      chrome.storage.local.set(response);
     });
   });
 
@@ -53,8 +56,12 @@ funcs.mainContent = (view, menu) => {
   menu.frameElement.addEventListener('load', (e) => {
     const doc = e.target.contentWindow.document;
 
+    // Logout hook
     const logoutElement = doc.getElementsByClassName('logout')[0];
-    logoutElement.addEventListener('click', () => {
+    logoutElement.addEventListener('click', (event) => {
+      // ログアウトをキャンセル
+      event.preventDefault();
+
       chrome.storage.local.get(['user'], (items) => {
         chrome.runtime.sendMessage({
           action: 'logout',
@@ -63,7 +70,12 @@ funcs.mainContent = (view, menu) => {
           },
         }, () => {
           // Logout したら storage をクリアする
-          chrome.storage.local.clear();
+          console.log('logout');
+          chrome.storage.local.clear(() => {
+            // ログアウト実行
+            const href = event.target.getAttribute('href');
+            location.href = href;
+          });
         });
       });
     });

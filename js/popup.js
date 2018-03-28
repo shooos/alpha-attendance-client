@@ -6,15 +6,13 @@ const elements = {
   btnChangePassword: document.getElementById('btn-change-password'),
 };
 
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  console.log(changes, areaName);
-});
+// 画面描画処理
+const render = (args) => {
+  console.log('render: ', args);
+  elements.user.value = args.user || '';
+  elements.message.value = args.message || '';
 
-chrome.storage.local.get(['user', 'status', 'message'], (items) => {
-  elements.user.value = items.user || '';
-  elements.message.value = items.message || 'No Message';
-
-  switch (items.status) {
+  switch (args.status) {
   case 'MemberNotFoundError':
     elements.btnChangePassword.classList.remove('hidden');
     elements.btnRegister.classList.remove('hidden');
@@ -31,13 +29,32 @@ chrome.storage.local.get(['user', 'status', 'message'], (items) => {
     elements.message.classList.remove('error');
     break;
   }
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  console.log('changed: ', changes, areaName);
+  render(changes);
 });
+
+// 初期表示処理
+chrome.storage.local.get(['user', 'status', 'message'], (items) => {
+  console.log(items);
+  render(items);
+});
+
+const beginRequest = () => {
+  chrome.storage.local.set({
+    message: 'Now requesting...',
+    status: 'Requesting',
+  });
+}
 
 /* ユーザ登録 */
 let registerRequesting = false;
 elements.btnRegister.addEventListener('mousedown', (e) => {
   if (registerRequesting) return;
   registerRequesting = true;
+  beginRequest();
 
   chrome.storage.local.get(['user', 'password'], (items) => {
     chrome.runtime.sendMessage({
@@ -46,6 +63,10 @@ elements.btnRegister.addEventListener('mousedown', (e) => {
         id: items.user,
         password: items.password,
       },
+    }, (response) => {
+      console.log('response: ', response);
+      registerRequesting = false;
+      chrome.storage.local.set(response);
     });
   });
 });
@@ -55,6 +76,7 @@ let loginRequesting = false;
 elements.btnLogin.addEventListener('mousedown', (e) => {
   if (loginRequesting) return;
   loginRequesting = true;
+  beginRequest();
 
   chrome.storage.local.get(['user', 'password'], (items) => {
     chrome.runtime.sendMessage({
@@ -63,6 +85,10 @@ elements.btnLogin.addEventListener('mousedown', (e) => {
         id: items.user,
         password: items.password,
       },
+    }, (response) => {
+      console.log('response: ', response);
+      loginRequesting = false;
+      chrome.storage.local.set(response);
     });
   });
 });

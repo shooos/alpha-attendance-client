@@ -50,17 +50,20 @@ request.post = async (url, data, options) => {
 const actions = {};
 
 /* ユーザ登録 */
-actions.registerUser = async (sender, args, baseUrl) => {
+actions.registerUser = async (sender, args, baseUrl, callback) => {
   const data = {
     id: args.id,
     password: args.password,
   };
   const response = await request.post([baseUrl, 'user', 'register'].join('/'), data)
     .catch((err) => {
-      throw err;
+      callback({
+        status: 'RegisterUserFailed',
+        message: response.message,
+      });
     });
   if (response.err) {
-    chrome.storage.local.set({
+    callback({
       status: 'RegisterUserFailed',
       message: response.message,
     });
@@ -70,8 +73,8 @@ actions.registerUser = async (sender, args, baseUrl) => {
 }
 
 /* ログイン処理 */
-actions.login = async (sender, args, baseUrl) => {
-  const local = {
+actions.login = async (sender, args, baseUrl, callback) => {
+  const result = {
     user: args.id,
     password: args.password,
     status: null,
@@ -84,32 +87,35 @@ actions.login = async (sender, args, baseUrl) => {
   };
   const response = await request.post([baseUrl, 'user', 'login'].join('/'), data)
     .catch((err) => {
+      console.log('error!');
       popupBadge.setError();
-      local.status = 'LoginFailed';
+      result.status = 'LoginFailed';
       if (err.name === 'TypeError') {
-        local.message = 'Login request failed.';
+        result.message = 'Login request failed.';
       } else {
-        local.message = err.message;
+        result.message = err.message;
       }
     });
 
   if (response && response.error) {
     popupBadge.setError();
-    local.status = response.error;
-    local.message = response.message;
+    result.status = response.error;
+    result.message = response.message;
   } else if (response && response.data) {
     popupBadge.setSuccess();
-    local.status = 'LoggedIn';
-    local.token = response.data.token;
+    result.status = 'LoggedIn';
+    result.token = response.data.token;
   }
-
-  chrome.storage.local.set(local);
+  callback(result);
 }
 
 /* ログアウト */
 actions.logout = async (sender, args, baseUrl, callback) => {
-  await request.post([baseUrl, 'user', 'logout'].join('/'), {id: args.id});
-  if (callback) callback();
+  await request.post([baseUrl, 'user', 'logout'].join('/'), {id: args.id})
+    .catch((err) => {
+      console.error(err);
+    });
+  callback();
 }
 
 /* 勤務形態登録 */
@@ -120,7 +126,7 @@ actions.registerWorkPattern = async (sender, args, baseUrl, callback) => {
 
     const headers = {'authorization': 'Bearer ' + token};
     const response = await request.post([baseUrl, 'workPattern', 'register'].join('/'), args, {headers: headers});
-    if (callback) callback(response);
+    callback(response);
   });
 }
 
@@ -132,7 +138,7 @@ actions.getWorkPattern = async (sender, args, baseUrl, callback) => {
 
     const headers = {'authorization': 'Bearer ' + token};
     const response = await request.get([baseUrl, 'workPattern', 'id', args.id].join('/'), {headers: headers});
-    if (callback) callback(response);
+    callback(response);
   });
 }
 
@@ -144,7 +150,7 @@ actions.getPatterns = async (sender, args, baseUrl, callback) => {
 
     const headers = {'authorization': 'Bearer ' + token};
     const response = await request.get([baseUrl, 'workPattern', 'list'].join('/'), {headers: headers});
-    if (callback) callback(response);
+    callback(response);
   });
 }
 
