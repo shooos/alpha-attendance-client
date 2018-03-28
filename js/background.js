@@ -87,7 +87,6 @@ actions.login = async (sender, args, baseUrl, callback) => {
   };
   const response = await request.post([baseUrl, 'user', 'login'].join('/'), data)
     .catch((err) => {
-      console.log('error!');
       popupBadge.setError();
       result.status = 'LoginFailed';
       if (err.name === 'TypeError') {

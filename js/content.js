@@ -1,11 +1,42 @@
 let baseUrl;
+
+const Indicator = function () {
+  this.loader = document.createElement('div');
+  this.loader.classList.add('alpha-attendance-loader');
+
+  this.indicator = document.createElement('div');
+  this.indicator.classList.add('alpha-attendance-indicator');
+  this.indicator.classList.add('hidden');
+  this.indicator.appendChild(this.loader);
+
+  let body = document.body;
+  if (body.tagName === 'FRAMESET') {
+    body = document.getElementsByTagName('html')[0];
+  }
+  body.appendChild(this.indicator);
+}
+Indicator.prototype.show = function () {
+  this.indicator.classList.remove('hidden');
+}
+Indicator.prototype.hide = function () {
+  this.indicator.classList.add('hidden');
+}
+
 const funcs = {};
 
 funcs.loginForm = (form) => {
   const elements = form.elements;
   let userIDForm, passwordForm;
+  const indicator = new Indicator();
 
-  form.addEventListener('submit', () => {
+  let preventEvent = true;
+  form.addEventListener('submit', (e) => {
+    if (!preventEvent) return;
+
+    e.preventDefault();
+    indicator.show();
+
+    const target = e.target;
     const utf8arr = CryptoJS.enc.Utf8.parse(passwordForm.value);
     const hash = CryptoJS.SHA256(utf8arr);
     const passwordHash = CryptoJS.enc.Base64.stringify(hash);
@@ -17,8 +48,10 @@ funcs.loginForm = (form) => {
         password: passwordHash,
       },
     }, (response) => {
-      console.log(response);
-      chrome.storage.local.set(response);
+      chrome.storage.local.set(response, () => {
+        preventEvent = false;
+        target.submit();
+      });
     });
   });
 
@@ -35,6 +68,8 @@ funcs.loginForm = (form) => {
 }
 
 funcs.mainContent = (view, menu) => {
+  const indicator = new Indicator();
+
   // 現在日付
   const n = new Date();
   const now = {
@@ -62,6 +97,7 @@ funcs.mainContent = (view, menu) => {
       // ログアウトをキャンセル
       event.preventDefault();
 
+      indicator.show();
       chrome.storage.local.get(['user'], (items) => {
         chrome.runtime.sendMessage({
           action: 'logout',
@@ -70,7 +106,6 @@ funcs.mainContent = (view, menu) => {
           },
         }, () => {
           // Logout したら storage をクリアする
-          console.log('logout');
           chrome.storage.local.clear(() => {
             // ログアウト実行
             const href = event.target.getAttribute('href');
