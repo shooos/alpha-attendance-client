@@ -7,8 +7,50 @@ popupBadge.setSuccess = () => {
   chrome.browserAction.setBadgeBackgroundColor({color: [0, 200, 0, 10]});
   chrome.browserAction.setBadgeText({text: '👍'});
 }
+popupBadge.setRequesting = () => {
+  chrome.browserAction.setBadgeBackgroundColor({color: [0, 0, 200, 10]});
+  chrome.browserAction.setBadgeText({text: '🔃'});
+}
+popupBadge.clear = () => {
+  chrome.browserAction.setBadgeText({text: ''});
+}
+
+const getChromeStorage = async (area, keys) => {
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.storage[area].get(keys, (items) => {
+        resolve(items);
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+const setChromeStorage = async (area, items) => {
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.storage[area].set(items, () => {
+        resolve();
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
 
 const request = {};
+request.head = async (url, options) => {
+  const response = await fetch(url, {
+    method: 'HEAD'
+  }).catch((err) => {
+    throw err;
+  });
+
+  if (response.status != 200) {
+    throw new Error(response.statusText);
+  }
+}
 request.get = async (url, options) => {
   const headers = {'Content-Type': 'application/json'};
   if (options && options.headers) {
@@ -47,33 +89,77 @@ request.post = async (url, data, options) => {
   return response.json();
 }
 
+// 認証ヘッダ作成
+const createAutorizationHeader = async () => {
+  const items = await getChromeStorage('local', ['token']);
+  const token = items.token;
+  if (!token) return {};
+  return {'authorization': 'Bearer ' + token};
+}
+
 const actions = {};
 
+/* バッジをセットする */
+actions.setBadge = async (sender, args) => {
+  switch (args.type) {
+  case 'error':
+    popupBadge.setError();
+    break;
+  case 'success':
+    popupBadge.setSuccess();
+    break;
+  case 'requesting':
+    popupBadge.setRequesting();
+    break;
+  case 'clear':
+    popupBadge.clear();
+    break;
+  }
+
+  return;
+}
+
+/* コネクションの確認 */
+actions.connection = async (sender, args, baseUrl) => {
+  await request.head([baseUrl, ''].join('/'))
+  .catch((err) => {
+    popupBadge.setError();
+    setChromeStorage('local', {
+      status: 'ConnectionFailed',
+      message: 'Unable to connect to the server.',
+    });
+    throw err;
+  });
+  return;
+}
+
 /* ユーザ登録 */
-actions.registerUser = async (sender, args, baseUrl, callback) => {
+actions.registerUser = async (sender, args, baseUrl) => {
   const data = {
     id: args.id,
     password: args.password,
   };
-  const response = await request.post([baseUrl, 'user', 'register'].join('/'), data)
+  let response = await request.post([baseUrl, 'user', 'register'].join('/'), data)
     .catch((err) => {
-      callback({
+      response = {
         status: 'RegisterUserFailed',
         message: response.message,
-      });
+      };
     });
   if (response.err) {
-    callback({
+    response = {
       status: 'RegisterUserFailed',
       message: response.message,
-    });
+    };
   } else {
-    await actions.login(sender, args, baseUrl, callback);
+    response = await actions.login(sender, args, baseUrl, callback);
   }
+
+  return response;
 }
 
 /* ログイン処理 */
-actions.login = async (sender, args, baseUrl, callback) => {
+actions.login = async (sender, args, baseUrl) => {
   const result = {
     user: args.id,
     password: args.password,
@@ -105,52 +191,50 @@ actions.login = async (sender, args, baseUrl, callback) => {
     result.status = 'LoggedIn';
     result.token = response.data.token;
   }
-  callback(result);
+  return result;
 }
 
 /* ログアウト */
-actions.logout = async (sender, args, baseUrl, callback) => {
+actions.logout = async (sender, args, baseUrl) => {
   await request.post([baseUrl, 'user', 'logout'].join('/'), {id: args.id})
     .catch((err) => {
-      console.error(err);
+      popupBadge.setError();
+      setChromeStorage({
+        status: 'LogoutFailed',
+        message: 'Logout failed.',
+      });
+      throw err;
     });
-  callback();
+  return;
 }
 
 /* 勤務形態登録 */
-actions.registerWorkPattern = async (sender, args, baseUrl, callback) => {
-  chrome.storage.local.get(['token'], async (items) => {
-    const token = items.token;
-    if (!token) return;
-
-    const headers = {'authorization': 'Bearer ' + token};
-    const response = await request.post([baseUrl, 'workPattern', 'register'].join('/'), args, {headers: headers});
-    callback(response);
-  });
+actions.registerWorkPattern = async (sender, args, baseUrl) => {
+  const headers = await createAutorizationHeader();
+  const response = await request.post([baseUrl, 'workPattern', 'register'].join('/'), args, {headers: headers});
+  return response;
 }
 
 /* 勤務形態取得 */
-actions.getWorkPattern = async (sender, args, baseUrl, callback) => {
-  chrome.storage.local.get(['token'], async (items) => {
-    const token = items.token;
-    if (!token) return;
-
-    const headers = {'authorization': 'Bearer ' + token};
-    const response = await request.get([baseUrl, 'workPattern', 'id', args.id].join('/'), {headers: headers});
-    callback(response);
-  });
+actions.getWorkPattern = async (sender, args, baseUrl) => {
+  const headers = await createAutorizationHeader();
+  const response = await request.get([baseUrl, 'workPattern', 'id', args.id].join('/'), {headers: headers});
+  return response;
 }
 
 /* 勤務形態リスト取得 */
-actions.getPatterns = async (sender, args, baseUrl, callback) => {
-  chrome.storage.local.get(['token'], async (items) => {
-    const token = items.token;
-    if (!token) return;
+actions.getPatterns = async (sender, args, baseUrl) => {
+  const headers = await createAutorizationHeader();
+  const response = await request.get([baseUrl, 'workPattern', 'list'].join('/'), {headers: headers});
+  return response;
+}
 
-    const headers = {'authorization': 'Bearer ' + token};
-    const response = await request.get([baseUrl, 'workPattern', 'list'].join('/'), {headers: headers});
-    callback(response);
-  });
+/* 稼働予定を取得 */
+actions.getUserEstimates = async (sender, args, baseUrl) => {
+  const headers = await createAutorizationHeader();
+  const url = [baseUrl, 'attendance', 'estimates', args.user, args.year, args.month].join('/')
+  const response = await request.get(url, {headers: headers});
+  return response;
 }
 
 chrome.runtime.onMessage.addListener((message, sender, callback) => {
@@ -164,10 +248,35 @@ chrome.runtime.onMessage.addListener((message, sender, callback) => {
     baseUrl.push(items.ssl ? 'https:/' : 'http:/');
     baseUrl.push(host + ':' + port);
     baseUrl.push('alpha');
-    await actions[message.action](sender, message.values, baseUrl.join('/'), callback)
+
+    if (message.action) {
+      const response = await actions[message.action](sender, message.values, baseUrl.join('/'))
       .catch((err) => {
-        console.error(err);
+        popupBadge.setError();
+        setChromeStorage('local', {
+          states: err.name,
+          message: err.message,
+        });
+        throw err;
       });
+      callback(response);
+    } else if (message.actions) {
+      const actionList = [];
+      message.actions.forEach((action, index) => {
+        actionList.push(actions[action](sender, message.values[index], baseUrl.join('/')));
+      });
+      const responses = await Promise.all(actionList)
+      .catch((err) => {
+        popupBadge.setError();
+        setChromeStorage('local', {
+          status: err.name,
+          message: err.message,
+        });
+        throw err;
+      });
+      console.log(responses);
+      callback(responses);
+    }
   });
 
   return true;

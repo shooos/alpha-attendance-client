@@ -1,4 +1,5 @@
-const elements = {
+﻿const elements = {
+  status: document.getElementById('status'),
   user: document.getElementById('user'),
   message: document.getElementById('message'),
   btnLogin: document.getElementById('btn-login'),
@@ -15,6 +16,10 @@ popupBadge.setError = () => {
 popupBadge.setSuccess = () => {
   chrome.browserAction.setBadgeBackgroundColor({color: [0, 200, 0, 10]});
   chrome.browserAction.setBadgeText({text: '👍'});
+}
+popupBadge.setRequesting = () => {
+  chrome.browserAction.setBadgeBackgroundColor({color: [0, 0, 200, 10]});
+  chrome.browserAction.setBadgeText({text: '🔃'});
 }
 
 // インジケータ
@@ -39,10 +44,32 @@ const indicator = new Indicator();
 
 // 画面描画処理
 const render = (args) => {
+  elements.status.value = args.status || '';
   elements.user.value = args.user || '';
   elements.message.value = args.message || '';
 
+  if (args.status !== 'Requesting') {
+    elements.btnChangePassword.classList.add('hidden');
+    elements.btnRegister.classList.add('hidden');
+    elements.btnLogin.classList.add('hidden');
+    elements.message.classList.remove('error');
+  }
+
+  if (!args.status) return;
+
   switch (args.status) {
+  case 'Success':
+  case 'AlreadyLoginError':
+  case 'LoggedIn':
+    popupBadge.setSuccess();
+    break;
+  case 'Requesting':
+    popupBadge.setRequesting();
+    break;
+  case 'Error':
+    elements.message.classList.add('error');
+    popupBadge.setError();
+    break;
   case 'MemberNotFoundError':
     elements.btnChangePassword.classList.remove('hidden');
     elements.btnRegister.classList.remove('hidden');
@@ -54,14 +81,9 @@ const render = (args) => {
     elements.message.classList.add('error');
     popupBadge.setError();
     break;
-  case 'Error':
+  default:
     elements.message.classList.add('error');
     popupBadge.setError();
-    break;
-  default:
-    elements.message.classList.remove('error');
-    popupBadge.setSuccess();
-    break;
   }
 }
 
