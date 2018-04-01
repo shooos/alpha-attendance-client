@@ -62,31 +62,178 @@ Indicator.prototype.hide = function () {
   this.indicator.classList.add('hidden');
 }
 
+// 一括入力ダイアログを作成する
+const createBatchInputDialog = (doc, patterns) => {
+  const pageOverlay = doc.createElement('div');
+  pageOverlay.classList.add('alpha-attendance-page-overlay');
+  pageOverlay.addEventListener('mousedown', () => {
+    close();
+  });
+
+  const dialog = doc.createElement('div');
+  dialog.classList.add('alpha-attendance-dialog');
+  dialog.setAttribute('id', 'batch-input-dialog');
+  dialog.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+  });
+
+  // title section
+  const titleSection = doc.createElement('section');
+  const title = doc.createElement('label');
+  title.textContent = '予定一括入力';
+  title.classList.add('dialog-title');
+  titleSection.appendChild(title);
+  dialog.appendChild(titleSection);
+
+  // body section
+  const bodySection = doc.createElement('section');
+  bodySection.classList.add('body-section');
+  // batch input table
+  const table = doc.createElement('table');
+  table.classList.add('alpha-attendance-table');
+  const headRow = table.createTBody().insertRow();
+  const headers = ['形態', '開始', '終了'];
+  for (let head of headers) {
+    const th = doc.createElement('th');
+    th.textContent = head;
+    headRow.appendChild(th);
+  }
+  const tr = table.tBodies.item(0).insertRow();
+  const elements = [
+    createPatternSelector(doc, 'batch-pattern', null, 'FUTURE', 0, patterns),
+    createTimePicker(doc, 'batch-start', null, 'FUTURE'),
+    createTimePicker(doc, 'batch-end', null, 'FUTURE'),
+  ];
+  for (let element of elements) {
+    const cell = tr.insertCell();
+    cell.appendChild(element);
+  }
+  bodySection.appendChild(table);
+  dialog.appendChild(bodySection);
+
+  // buttons section
+  const buttonsSection = doc.createElement('section');
+  buttonsSection.classList.add('buttons-section');
+  // cancel button
+  const cancelButton = doc.createElement('div');
+  cancelButton.classList.add('dialog-button-cancel');
+  cancelButton.textContent = 'Cancel';
+  cancelButton.addEventListener('mousedown', () => {
+    close();
+  });
+  buttonsSection.appendChild(cancelButton);
+  // done button
+  const doneButton = doc.createElement('div');
+  doneButton.classList.add('dialog-button-done');
+  doneButton.textContent = 'Done';
+  doneButton.addEventListener('mousedown', () => {
+    const patternTag = elements[0];
+    const pattern = patternTag.selectedIndex;
+    const startTime = elements[1].value;
+    const endTime = elements[2].value;
+    const trs = doc.querySelectorAll('body > table.alpha-attendance-table tbody > tr:not(.stateRecognition):not(.statePresent)');
+
+    for (let tr of trs) {
+      const dayOffTag = tr.querySelector('[name="day-off"]');
+      if (!dayOffTag || dayOffTag.checked) continue;
+
+      const patternTag = tr.querySelector('[name="pattern"]');
+      const startTag = tr.querySelector('[name="start"]');
+      const endTag = tr.querySelector('[name="end"]');
+
+      patternTag.selectedIndex = pattern;
+      startTag.value = startTime;
+      endTag.value = endTime;
+    }
+
+    close();
+  });
+  buttonsSection.appendChild(doneButton);
+  dialog.appendChild(buttonsSection);
+
+  pageOverlay.appendChild(dialog);
+  doc.body.appendChild(pageOverlay);
+
+  /** ダイアログを開く */
+  const open = () => {
+    pageOverlay.classList.add('opened');
+  }
+
+  /** ダイアログを閉じる */
+  const close = () => {
+    pageOverlay.classList.remove('opened');
+  }
+
+  /** ダイアログの位置を設定する */
+  const setPosition = (x, y) => {
+    dialog.style.left = x + 'px';
+    dialog.style.top = y + 'px';
+  }
+
+  return {
+    open: open,
+    close: close,
+    setPosition: setPosition,
+  }
+}
+
 // 勤務表テーブル上部にツールボックスを生成する
-const createToolBox = (doc, table) => {
+const createToolBox = (doc, table, patterns, yearMonth) => {
   const box = doc.createElement('div');
   box.classList.add('alpha-attendance-toolbox');
+  const batchInputDialog = createBatchInputDialog(doc, patterns);
 
   const batchInput = doc.createElement('div');
   batchInput.classList.add('tool-item');
   batchInput.textContent = '一括入力';
-  batchInput.addEventListener('mousedown', () => {
-    const dialog = openBatchInputDialog(doc);
+  batchInput.addEventListener('mousedown', (e) => {
+    batchInputDialog.setPosition(e.clientX, e.clientY);
+    batchInputDialog.open();
   });
   box.appendChild(batchInput);
 
   const register = doc.createElement('div');
   register.classList.add('tool-item');
   register.textContent = '予定登録';
-  register.addEventListener('mousedown', () => {
+  register.addEventListener('mousedown', async () => {
+    const estimates = [];
+    const trs = doc.querySelectorAll('body > table.alpha-attendance-table > tbody > tr');
 
+    for (let tr of trs) {
+      const dayOffTag = tr.querySelector('[name="day-off"]');
+      if (!dayOffTag) continue;
+      const patternTag = tr.querySelector('[name="pattern"]');
+      const pattern = patternTag.options[patternTag.selectedIndex].value;
+      const startTag = tr.querySelector('[name="start"]');
+      const endTag = tr.querySelector('[name="end"]');
+      const unclaimedtag = tr.querySelector('[name="unclaim"]');
+
+      const estimate = {
+        date: moment({y: yearMonth.year, M: yearMonth.month - 1, d: getRowDate(tr)}).format('YYYY-MM-DD'),
+        dayOff: dayOffTag.checked,
+        workPatternId: pattern,
+        startTime: startTag.value,
+        endTime: endTag.value,
+        unclaimedHours: unclaimedtag.value,
+      };
+      estimates.push(estimate);
+    }
+
+    const items = await getChromeStorage('local', ['user']);
+    await runtimeSendMessage({
+      action: 'registerEstimates',
+      values: {
+        memberId: items.user,
+        detail: estimates,
+      },
+    });
   });
   box.appendChild(register);
 
   const thead = table.createTHead();
   const headRow = thead.insertRow();
   const cell = headRow.insertCell();
-  cell.colSpan = 14;
+  cell.colSpan = 15;
   cell.appendChild(box);
 }
 
@@ -97,38 +244,57 @@ const getRowDate = (row) => {
 }
 
 // 時刻・時間入力アイテム作成
-const createTimePicker = (doc, now, viewState, rowDate) => {
+const createTimePicker = (doc, name, now, viewState, rowDate) => {
   const tag = doc.createElement('input');
+  tag.setAttribute('name', name);
   tag.classList.add('alpha-attendance-input-time');
-  tag.readonly = isReadonly(viewState, rowDate, now);
+  tag.readOnly = isReadonly(viewState, rowDate, now);
+
+  if (!tag.readOnly) {
+    tag.addEventListener('focus', (e) => {
+      tag.select();
+    });
+    tag.addEventListener('input', (e) => {
+      const input = e.data;
+      const value = e.target.value;
+      if (input && !(/[0-9]/.test(input))) {
+        e.target.value = value.slice(0, -1);
+      } else if (input && value.length === 2) {
+        e.target.value += ':';
+      } else if (input && value.length > 5) {
+        e.target.value = value.substr(0, 5);
+      }
+    });
+  }
 
   return tag;
 }
 
 // 勤務形態選択アイテム作成
-const createPatternSelector = (doc, now, viewState, rowDate, patterns) => {
+const createPatternSelector = (doc, name, now, viewState, rowDate, patterns) => {
   let tag;
   if (isReadonly(viewState, rowDate, now)) {
     tag = doc.createElement('input');
     tag.classList.add('alpha-attendance-display-pattern');
-    tag.readonly = true;
+    tag.readOnly = true;
   } else {
     tag = doc.createElement('select');
     tag.classList.add('alpha-attendance-select-pattern');
     for (let pattern of patterns) {
       const option = doc.createElement('option');
-      option.value = pattern.workPatternId;
-      option.textContent = pattern.label || pattern.workPatternId;
+      option.value = pattern.workPatternId || null;
+      option.textContent = pattern.label || pattern.workPatternId || '';
       tag.appendChild(option);
     }
   }
+  tag.setAttribute('name', name);
 
   return tag;
 }
 
 // 読み取り専用にするか
 const isReadonly = (viewState, rowDate, now) => {
-  return (viewState === 'PAST' || (viewState === 'CURRENT' && now.day > rowDate));
+  return (viewState === 'PAST' || (viewState === 'CURRENT' && now.day >= rowDate));
 }
 
 // 表示中の勤務表の年月を取得
@@ -158,14 +324,19 @@ const createExtendColumnDefinitions = (doc, now) => {
   return [
     {
       header: '休暇(予定)',
-      name: 'dayOff',
       classes: ['alpha-attendance-center'],
       innerTag: (viewState, rowDate, row, data, patterns) => {
         const tag = doc.createElement('label');
         const checkbox = doc.createElement('input');
         checkbox.setAttribute('type', 'checkbox');
         checkbox.checked = data ? data.dayOff : row.firstElementChild.classList.contains('holiday');
-        checkbox.disabled = isReadonly(viewState, row, now);
+        checkbox.disabled = isReadonly(viewState, rowDate, now);
+        checkbox.setAttribute('name', 'day-off');
+
+        tag.addEventListener('change', () => {
+          tag.style.background = checkbox.checked ? '#f99' : '';
+        });
+        tag.style.background = checkbox.checked ? '#f99' : '';
         tag.appendChild(checkbox);
 
         return tag;
@@ -173,9 +344,8 @@ const createExtendColumnDefinitions = (doc, now) => {
     },
     {
       header: '形態(予定)',
-      name: 'pattern',
       innerTag: (viewState, rowDate, row, data, patterns) => {
-        const tag = createPatternSelector(doc, now, viewState, rowDate, patterns);
+        const tag = createPatternSelector(doc, 'pattern', now, viewState, rowDate, patterns);
         if (data && tag.tagName === 'INPUT') {
           tag.value = data.workPatternId;
         } else if (data && tag.tagName === 'SELECT') {
@@ -183,37 +353,42 @@ const createExtendColumnDefinitions = (doc, now) => {
           const list = Array.apply(null, tag.querySelectorAll('option'));
           tag.selectedIndex = list.indexOf(option);
         }
-
         return tag;
       },
     },
     {
       header: '開始(予定)',
-      name: 'start',
+      classes: ['right'],
       innerTag: (viewState, rowDate, row, data) => {
-        const tag = createTimePicker(doc, now, viewState, rowDate);
+        const tag = createTimePicker(doc, 'start', now, viewState, rowDate);
         if (data) tag.value = data.startTime;
-
         return tag;
       },
     },
     {
       header: '終了(予定)',
-      name: 'end',
+      classes: ['right'],
       innerTag: (viewState, rowDate, row, data) => {
-        const tag = createTimePicker(doc, now, viewState, rowDate);
-        if (data) tag.value = date.endTime;
-
+        const tag = createTimePicker(doc, 'end', now, viewState, rowDate);
+        if (data) tag.value = data.endTime;
         return tag;
       },
     },
     {
       header: '非請求(予定)',
-      name: 'unclaimed',
+      classes: ['right'],
       innerTag: (viewState, rowDate, row, data) => {
-        const tag = createTimePicker(doc, now, viewState, rowDate);
-        if (data) tag.value = date.unclaimedHours;
-
+        const tag = createTimePicker(doc, 'unclaim', now, viewState, rowDate);
+        if (data) tag.value = data.unclaimedHours === '00:00' ? '' : data.unclaimedHours;
+        return tag;
+      },
+    },
+    {
+      header: '稼働(予定)',
+      classes: ['right'],
+      innerTag: (viewState, rowDate, row, data) => {
+        const tag = createTimePicker(doc, 'claim', null, 'PAST', null);
+        if (data) tag.value = data.estimateHours
         return tag;
       },
     },
@@ -230,7 +405,6 @@ const extendAttendanceList = async (doc, now, yearMonth) => {
     }
   }
   table.classList.add('alpha-attendance-table');
-  createToolBox(doc, table);
 
   // 追加列の定義
   const columnDefinitions = createExtendColumnDefinitions(doc, now);
@@ -259,7 +433,10 @@ const extendAttendanceList = async (doc, now, yearMonth) => {
     }
 
     const patterns = workPatternsResponse.data;
+    patterns.unshift('');
     const estimates = estimatesResponse.data;
+
+    createToolBox(doc, table, patterns, yearMonth);
 
     // 列ヘッダを追加する
     const rows = Array.apply(null, table.querySelectorAll('tbody>tr'));
@@ -273,24 +450,29 @@ const extendAttendanceList = async (doc, now, yearMonth) => {
     // 各行に列を追加する
     for (let row of rows) {
       const rowDate = getRowDate(row);
-      const estimate = estimates[0];
-      const estimateDate = estimate ? (moment(estimate.date).format('D') - 0) : 0;
       let data;
-      if (estimateDate === rowDate) {
-        // 行の日付と一致するデータを使う
-        data = estimates.shift();
+      while (estimates.length) {
+        const estimate = estimates[0];
+        const estimateDate = estimate ? (moment(estimate.date).format('D') - 0) : 0;
+        console.log(estimateDate, rowDate);
+        if (estimateDate < rowDate) {
+          estimates.shift();
+        } else if (estimateDate === rowDate) {
+          // 行の日付と一致するデータを使う
+          data = estimates.shift();
+          break;
+        }
       }
+      console.log(data);
 
       for (let definition of columnDefinitions) {
         const td = doc.createElement('td');
-        td.setAttribute('name', definition.name);
         if (definition.classes) {
           for (let clazz of definition.classes) {
             td.classList.add(clazz);
           }
         }
         td.appendChild(definition.innerTag(yearMonth.state, rowDate, row, data, patterns));
-        console.log(td);
         row.appendChild(td);
       }
     }
@@ -350,7 +532,6 @@ funcs.loginForm = (form) => {
 
   let preventEvent = true;
   form.addEventListener('submit', async (e) => {
-    console.log('listener');
     if (!preventEvent) return;
 
     e.preventDefault();
@@ -371,7 +552,6 @@ funcs.loginForm = (form) => {
     await setChromeStorage('local', response);
     preventEvent = false;
     form.submit();
-    console.log('listener end');
   });
 
   for (let element of elements) {
@@ -423,7 +603,6 @@ funcs.mainContent = (view, menu) => {
           type: 'clear',
         },
       });
-      console.log('set badge');
       chrome.storage.local.clear(() => {
         // ログアウト実行
         const href = event.target.getAttribute('href');
@@ -445,9 +624,22 @@ funcs.mainContent = (view, menu) => {
     doc.head.appendChild(link);
 
     if (title.startsWith('勤務表')) {
-      // 勤務表ページ
+      // 勤務表
       const yearMonth = getYearMonth(doc, now);
       extendAttendanceList(doc, now, yearMonth);
+    } else if (title.startsWith('報告書作成')) {
+      // 報告書作成
+      const inputForm = doc.forms['inputForm'];
+      console.log(inputForm);
+      const submitButton = inputForm.querySelector('[value="提出"]');
+      submitButton.addEventListener('mousedown', async () => {
+        await runtimeSendMessage({
+          action: 'registerActual',
+          values: {
+
+          },
+        });
+      });
     }
   });
 }
