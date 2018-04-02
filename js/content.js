@@ -632,13 +632,23 @@ funcs.mainContent = (view, menu) => {
       const inputForm = doc.forms['inputForm'];
       console.log(inputForm);
       const submitButton = inputForm.querySelector('[value="提出"]');
+
       submitButton.addEventListener('mousedown', async () => {
+        const items = await getChromeStorage('local', ['user']);
         await runtimeSendMessage({
           action: 'registerActual',
           values: {
-
+            memberId: items.user,
+            date: moment().format('YYYY-MM-DD'),
+            workPattern: pattern,
+            detail: actuals,
           },
         });
+      });
+    } else if (title.startsWith('作業内容編集')) {
+      // 作業内容編集
+      setChromeStorage('local', {
+        actualDetails: [],
       });
     }
   });

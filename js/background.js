@@ -245,6 +245,14 @@ actions.registerEstimates = async (sender, args, baseUrl) => {
   return response;
 }
 
+/* 実績を登録 */
+actions.registerActual = async (sender, args, baseUrl) => {
+  const headers = await createAutorizationHeader();
+  const url = [baseUrl, 'attendance', 'actual'].join('/');
+  const response = await request.post(url, args, {headers: headers});
+  return response;
+}
+
 chrome.runtime.onMessage.addListener((message, sender, callback) => {
   console.log('onMessage', message, sender, callback);
   chrome.storage.sync.get(['ssl', 'host', 'port'], async (items) => {
