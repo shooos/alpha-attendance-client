@@ -347,7 +347,8 @@ const createExtendColumnDefinitions = (doc, now) => {
       innerTag: (viewState, rowDate, row, data, patterns) => {
         const tag = createPatternSelector(doc, 'pattern', now, viewState, rowDate, patterns);
         if (data && tag.tagName === 'INPUT') {
-          tag.value = data.workPatternId;
+          const pattern = patterns.filter((pattern) => pattern.workPatternId === data.workPatternId)[0];
+          tag.value = pattern ? pattern.label : '';
         } else if (data && tag.tagName === 'SELECT') {
           const option = tag.querySelector('option[value="' + data.workPatternId + '"]');
           const list = Array.apply(null, tag.querySelectorAll('option'));
@@ -395,7 +396,7 @@ const createExtendColumnDefinitions = (doc, now) => {
   ];
 }
 
-// 勤務表を拡張する
+/* 勤務表を拡張する */
 const extendAttendanceList = async (doc, now, yearMonth) => {
   let table;
   for (let child of doc.body.childNodes) {
@@ -454,7 +455,6 @@ const extendAttendanceList = async (doc, now, yearMonth) => {
       while (estimates.length) {
         const estimate = estimates[0];
         const estimateDate = estimate ? (moment(estimate.date).format('D') - 0) : 0;
-        console.log(estimateDate, rowDate);
         if (estimateDate < rowDate) {
           estimates.shift();
         } else if (estimateDate === rowDate) {
@@ -463,7 +463,6 @@ const extendAttendanceList = async (doc, now, yearMonth) => {
           break;
         }
       }
-      console.log(data);
 
       for (let definition of columnDefinitions) {
         const td = doc.createElement('td');
@@ -489,6 +488,74 @@ const extendAttendanceList = async (doc, now, yearMonth) => {
     }],
   });
   await appendColumns(response);
+}
+
+/* 報告書作成を拡張する */
+const extendCreateReport = async (doc) => {
+  const inputForm = doc.forms['inputForm'];
+  const submitButton = inputForm.querySelector('[value="提出"]');
+  if (!submitButton) return;
+
+  const response = await runtimeSendMessage({
+    action: 'getPatterns',
+    values: {},
+  });
+
+  const indexForm = doc.forms['indexForm'];
+  const patternCell = indexForm.querySelector('tbody > tr:nth-child(2) > td:nth-child(2)');
+  const patternName = patternCell.textContent.replace(/\n/g, '');
+  const patterns = response.data || [];
+  const pattern = patterns.filter((pattern) => pattern.label === patternName)[0];
+  const workPatternId = pattern ? pattern.workPatternId : null;
+
+  const items = await getChromeStorage('local', ['user']);
+  const user = items.user;
+  const targetDate = doc.querySelector('span.current').textContent.replace(/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2}).*/, '$1-$2-$3');
+
+  const detail = [];
+  const trs = Array.apply(null, indexForm.querySelectorAll('tbody > tr:nth-child(n+2)')).reverse();
+  let nextBeginTime;
+  for (let tr of trs) {
+    const cells = tr.querySelectorAll('td');
+    const record = {
+      beginTime: cells.item(6).firstElementChild.textContent.replace(/\n/g, ''),
+      finishTime: cells.item(7).firstElementChild.textContent.replace(/\n/g, '') || nextBeginTime,
+      pCode: cells.item(4).textContent.replace(/\n/g, ''),
+    };
+    nextBeginTime = record.beginTime;
+
+    if (record.beginTime && record.finishTime) {
+      detail.unshift(record);
+    }
+  }
+
+  const values = {
+    memberId: user,
+    date: moment(targetDate, 'YYYY-M-D').format('YYYY-MM-DD'),
+    workPatternId: workPatternId,
+    detail: detail,
+  };
+
+  submitButton.addEventListener('mousedown', async () => {
+    if (!detail.length) return;
+
+    await runtimeSendMessage({
+      action: 'registerActual',
+      values: values,
+    });
+  });
+
+  // 以下、test用
+  const saveButton = inputForm.querySelector('[value="保存"]');
+  if (!saveButton) return;
+  saveButton.addEventListener('mousedown', async () => {
+    if (!detail.length) return;
+
+    await runtimeSendMessage({
+      action: 'registerActual',
+      values: values,
+    });
+  });
 }
 
 // 画面に応じて処理分岐
@@ -612,7 +679,7 @@ funcs.mainContent = (view, menu) => {
   });
 
   // view frame
-  view.frameElement.addEventListener('load', (e) => {
+  view.frameElement.addEventListener('load', async (e) => {
     const doc = e.target.contentWindow.document;
     const title = doc.title;
 
@@ -626,30 +693,10 @@ funcs.mainContent = (view, menu) => {
     if (title.startsWith('勤務表')) {
       // 勤務表
       const yearMonth = getYearMonth(doc, now);
-      extendAttendanceList(doc, now, yearMonth);
+      await extendAttendanceList(doc, now, yearMonth);
     } else if (title.startsWith('報告書作成')) {
       // 報告書作成
-      const inputForm = doc.forms['inputForm'];
-      console.log(inputForm);
-      const submitButton = inputForm.querySelector('[value="提出"]');
-
-      submitButton.addEventListener('mousedown', async () => {
-        const items = await getChromeStorage('local', ['user']);
-        await runtimeSendMessage({
-          action: 'registerActual',
-          values: {
-            memberId: items.user,
-            date: moment().format('YYYY-MM-DD'),
-            workPattern: pattern,
-            detail: actuals,
-          },
-        });
-      });
-    } else if (title.startsWith('作業内容編集')) {
-      // 作業内容編集
-      setChromeStorage('local', {
-        actualDetails: [],
-      });
+      await extendCreateReport(doc);
     }
   });
 }
