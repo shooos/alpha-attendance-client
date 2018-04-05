@@ -253,6 +253,23 @@ actions.registerActual = async (sender, args, baseUrl) => {
   return response;
 }
 
+/* 稼働月間サマリを取得 */
+actions.getSummary = async (sender, args, baseUrl) => {
+  const headers = await createAutorizationHeader();
+  const path = [baseUrl, 'attendance', 'summary', args.year, args.month];
+  args.user && path.push(args.user);
+  const url = path.join('/');
+  const response = await request.get(url, {headers: headers})
+  .catch((err) => {
+    return {
+      error: err.name,
+      messgae: err.message,
+    };
+  });
+  return response;
+}
+
+/* メッセージリスナ */
 chrome.runtime.onMessage.addListener((message, sender, callback) => {
   console.log('onMessage', message, sender, callback);
   chrome.storage.sync.get(['ssl', 'host', 'port'], async (items) => {
@@ -265,6 +282,7 @@ chrome.runtime.onMessage.addListener((message, sender, callback) => {
     baseUrl.push(host + ':' + port);
     baseUrl.push('alpha');
 
+    // action に応じて処理振り分け
     if (message.action) {
       const response = await actions[message.action](sender, message.values, baseUrl.join('/'))
       .catch((err) => {
@@ -290,7 +308,6 @@ chrome.runtime.onMessage.addListener((message, sender, callback) => {
         });
         throw err;
       });
-      console.log(responses);
       callback(responses);
     }
   });

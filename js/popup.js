@@ -7,6 +7,45 @@
   btnChangePassword: document.getElementById('btn-change-password'),
 };
 
+// chrome.storage.%area%.get を promise で包んだもの
+const getChromeStorage = async (area, keys) => {
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.storage[area].get(keys, (items) => {
+        resolve(items);
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// chrome.storage.%area%.set を promise で包んだもの
+const setChromeStorage = async (area, items) => {
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.storage[area].set(items, () => {
+        resolve();
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// chrome.runtime.sendMessage を promise で包んだもの
+const runtimeSendMessage = async (message) => {
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.runtime.sendMessage(message, (response) => {
+        resolve(response);
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 // Badge
 const popupBadge = {};
 popupBadge.setError = () => {
@@ -87,22 +126,22 @@ const render = (args) => {
   }
 }
 
-chrome.storage.onChanged.addListener((changes, areaName) => {
+// ストレージの変更監視
+chrome.storage.onChanged.addListener(async (changes, areaName) => {
   if (areaName !== 'local') return;
-
-  chrome.storage.local.get(['user', 'status', 'message'], (items) => {
-    render(items);
-  });
-});
-
-// 初期表示処理
-chrome.storage.local.get(['user', 'status', 'message'], (items) => {
+  const items = await getChromeStorage('local', ['user', 'status', 'message']);
   render(items);
 });
 
-const beginRequest = () => {
+// 初期表示処理
+getChromeStorage('local', ['user', 'status', 'message'])
+.then((items) => {
+  render(items);
+});
+
+const beginRequest = async () => {
   indicator.show();
-  chrome.storage.local.set({
+  await setChromeStorage('local', {
     message: 'Now requesting...',
     status: 'Requesting',
   });
@@ -110,48 +149,40 @@ const beginRequest = () => {
 
 /* ユーザ登録 */
 let registerRequesting = false;
-elements.btnRegister.addEventListener('mousedown', (e) => {
+elements.btnRegister.addEventListener('mousedown', async (e) => {
   if (registerRequesting) return;
   registerRequesting = true;
-  beginRequest();
+  await beginRequest();
 
-  chrome.storage.local.get(['user', 'password'], (items) => {
-    chrome.runtime.sendMessage({
-      action: 'registerUser',
-      values: {
-        id: items.user,
-        password: items.password,
-      },
-    }, (response) => {
-      console.log('response: ', response);
-      registerRequesting = false;
-      chrome.storage.local.set(response, () => {
-        indicator.hide();
-      });
-    });
+  const items = await getChromeStorage('local', ['user', 'password']);
+  const response = await runtimeSendMessage({
+    action: 'registerUser',
+    values: {
+      id: items.user,
+      password: items.password,
+    },
   });
+  registerRequesting = false;
+  await setChromeStorage('local', response);
+  indicator.hide();
 });
 
 /* ログイン */
 let loginRequesting = false;
-elements.btnLogin.addEventListener('mousedown', (e) => {
+elements.btnLogin.addEventListener('mousedown', async (e) => {
   if (loginRequesting) return;
   loginRequesting = true;
-  beginRequest();
+  await beginRequest();
 
-  chrome.storage.local.get(['user', 'password'], (items) => {
-    chrome.runtime.sendMessage({
-      action: 'login',
-      values: {
-        id: items.user,
-        password: items.password,
-      },
-    }, (response) => {
-      console.log('response: ', response);
-      loginRequesting = false;
-      chrome.storage.local.set(response, () => {
-        indicator.hide();
-      });
-    });
+  const items = await getChromeStorage('local', ['user', 'password']);
+  const response = await runtimeSendMessage({
+    action: 'login',
+    values: {
+      id: items.user,
+      password: items.password,
+    },
   });
+  loginRequesting = false;
+  await setChromeStorage('local', response);
+  indicator.hide();
 });

@@ -319,13 +319,13 @@ const getYearMonth = (doc, now) => {
   };
 }
 
-// 追加列の定義を生成
-const createExtendColumnDefinitions = (doc, now) => {
+/* 追加列の定義を生成 */
+const createExtendColumnDefinitions = () => {
   return [
     {
       header: '休暇(予定)',
       classes: ['alpha-attendance-center'],
-      innerTag: (viewState, rowDate, row, data, patterns) => {
+      innerTag: (doc, viewState, now, rowDate, row, data, patterns) => {
         const tag = doc.createElement('label');
         const checkbox = doc.createElement('input');
         checkbox.setAttribute('type', 'checkbox');
@@ -344,7 +344,7 @@ const createExtendColumnDefinitions = (doc, now) => {
     },
     {
       header: '形態(予定)',
-      innerTag: (viewState, rowDate, row, data, patterns) => {
+      innerTag: (doc, viewState, now, rowDate, row, data, patterns) => {
         const tag = createPatternSelector(doc, 'pattern', now, viewState, rowDate, patterns);
         if (data && tag.tagName === 'INPUT') {
           const pattern = patterns.filter((pattern) => pattern.workPatternId === data.workPatternId)[0];
@@ -360,7 +360,7 @@ const createExtendColumnDefinitions = (doc, now) => {
     {
       header: '開始(予定)',
       classes: ['right'],
-      innerTag: (viewState, rowDate, row, data) => {
+      innerTag: (doc, viewState, now, rowDate, row, data) => {
         const tag = createTimePicker(doc, 'start', now, viewState, rowDate);
         if (data) tag.value = data.startTime;
         return tag;
@@ -369,7 +369,7 @@ const createExtendColumnDefinitions = (doc, now) => {
     {
       header: '終了(予定)',
       classes: ['right'],
-      innerTag: (viewState, rowDate, row, data) => {
+      innerTag: (doc, viewState, now, rowDate, row, data) => {
         const tag = createTimePicker(doc, 'end', now, viewState, rowDate);
         if (data) tag.value = data.endTime;
         return tag;
@@ -378,7 +378,7 @@ const createExtendColumnDefinitions = (doc, now) => {
     {
       header: '非請求(予定)',
       classes: ['right'],
-      innerTag: (viewState, rowDate, row, data) => {
+      innerTag: (doc, viewState, now, rowDate, row, data) => {
         const tag = createTimePicker(doc, 'unclaim', now, viewState, rowDate);
         if (data) tag.value = data.unclaimedHours === '00:00' ? '' : data.unclaimedHours;
         return tag;
@@ -387,7 +387,7 @@ const createExtendColumnDefinitions = (doc, now) => {
     {
       header: '稼働(予定)',
       classes: ['right'],
-      innerTag: (viewState, rowDate, row, data) => {
+      innerTag: (doc, viewState, now, rowDate, row, data) => {
         const tag = createTimePicker(doc, 'claim', null, 'PAST', null);
         if (data) tag.value = data.estimateHours
         return tag;
@@ -398,88 +398,23 @@ const createExtendColumnDefinitions = (doc, now) => {
 
 /* 勤務表を拡張する */
 const extendAttendanceList = async (doc, now, yearMonth) => {
-  let table;
+  const summaryTable = doc.forms['dateForm'].nextSibling.querySelector('td:first-child > table');
+  summaryTable.classList.add('alpha-attendance-summary-table');
+
+  let attendanceTable;
   for (let child of doc.body.childNodes) {
     if (child.textContent === '週／月切替') {
-      table = child.nextSibling;
+      attendanceTable = child.nextSibling;
       break;
     }
   }
-  table.classList.add('alpha-attendance-table');
+  attendanceTable.classList.add('alpha-attendance-table');
 
-  // 追加列の定義
-  const columnDefinitions = createExtendColumnDefinitions(doc, now);
-
-  // 列を追加する
-  const appendColumns = async (responses) => {
-    const workPatternsResponse = responses.shift();
-    const estimatesResponse = responses.shift();
-
-    if (workPatternsResponse.error || estimatesResponse.error) {
-      const messages = [];
-      workPatternsResponse.error && messages.push(workPatternsResponse.message);
-      estimatesResponse.error && messages.push(estimatesResponse.message);
-
-      await setChromeStorage('local', {
-        status: 'GetEstimatesInfoFailed',
-        message: messages.join('\n'),
-      });
-      await runtimeSendMessage({
-        action: 'setBadge',
-        values: {
-          type: 'error',
-        },
-      });
-      return;
-    }
-
-    const patterns = workPatternsResponse.data;
-    patterns.unshift('');
-    const estimates = estimatesResponse.data;
-
-    createToolBox(doc, table, patterns, yearMonth);
-
-    // 列ヘッダを追加する
-    const rows = Array.apply(null, table.querySelectorAll('tbody>tr'));
-    const headElement = rows.shift();
-    for (let definition of columnDefinitions) {
-      const th = doc.createElement('th');
-      th.textContent = definition.header;
-      headElement.appendChild(th);
-    }
-
-    // 各行に列を追加する
-    for (let row of rows) {
-      const rowDate = getRowDate(row);
-      let data;
-      while (estimates.length) {
-        const estimate = estimates[0];
-        const estimateDate = estimate ? (moment(estimate.date).format('D') - 0) : 0;
-        if (estimateDate < rowDate) {
-          estimates.shift();
-        } else if (estimateDate === rowDate) {
-          // 行の日付と一致するデータを使う
-          data = estimates.shift();
-          break;
-        }
-      }
-
-      for (let definition of columnDefinitions) {
-        const td = doc.createElement('td');
-        if (definition.classes) {
-          for (let clazz of definition.classes) {
-            td.classList.add(clazz);
-          }
-        }
-        td.appendChild(definition.innerTag(yearMonth.state, rowDate, row, data, patterns));
-        row.appendChild(td);
-      }
-    }
-  }
+  const items = await getChromeStorage('local', ['user']);
+  await appendSummaryInfo(doc, summaryTable, now, yearMonth, items.user)
 
   // 勤務形態リストを取得する
-  const items = await getChromeStorage('local', ['user']);
-  const response = await runtimeSendMessage({
+  const responses = await runtimeSendMessage({
     actions: ['getPatterns', 'getUserEstimates'],
     values: [{}, {
       year: yearMonth.year,
@@ -487,7 +422,122 @@ const extendAttendanceList = async (doc, now, yearMonth) => {
       user: items.user,
     }],
   });
-  await appendColumns(response);
+  await appendAttendanceColumns(responses, doc, attendanceTable, now, yearMonth);
+}
+
+/* 勤務時間サマリテーブルに情報を追加する */
+const appendSummaryInfo = async (doc, summaryTable, now, yearMonth, user) => {
+  const response = await runtimeSendMessage({
+    action: 'getSummary',
+    values: {
+      year: yearMonth.year,
+      month: yearMonth.month,
+      user: user,
+    },
+  });
+  if (response.error) {
+    await setChromeStorage('local', {
+      status: response.error,
+      message: response.message,
+    });
+    await runtimeSendMessage({
+      action: 'setBadge',
+      values: {type: 'error'},
+    });
+    return;
+  }
+  const summaryInfo = response.data ? response.data[user] : {};
+
+  const th = doc.createElement('th');
+  // 予測行
+  const estimateSummaryInfo = summaryInfo.estimates;
+  const estimateRow = summaryTable.insertRow();
+  estimateRow.classList.add('alpha-attendance-summary-info');
+  // 予測請求稼働
+  const estimateLabel = th.cloneNode();
+  estimateLabel.textContent = '予測請求稼働';
+  estimateRow.appendChild(estimateLabel);
+  const estimateValue = estimateRow.insertCell();
+  estimateValue.textContent = estimateSummaryInfo.claimed;
+
+  // 実績行
+  const actualRow = summaryTable.insertRow();
+  actualRow.classList.add('alpha-attendance-summary-info');
+  // 請求稼働実績
+  const claimedActualLabel = th.cloneNode();
+  claimedActualLabel.textContent = '請求稼働実績';
+  actualRow.appendChild(claimedActualLabel);
+  const claimedActualValue = actualRow.insertCell();
+}
+
+/* 勤務表に列を追加する */
+const appendAttendanceColumns = async (responses, doc, attendanceTable, now, yearMonth) => {
+  // 追加列の定義
+  const columnDefinitions = createExtendColumnDefinitions();
+
+  const workPatternsResponse = responses.shift();
+  const estimatesResponse = responses.shift();
+
+  if (workPatternsResponse.error || estimatesResponse.error) {
+    const messages = [];
+    workPatternsResponse.error && messages.push(workPatternsResponse.message);
+    estimatesResponse.error && messages.push(estimatesResponse.message);
+
+    await setChromeStorage('local', {
+      status: 'GetEstimatesInfoFailed',
+      message: messages.join('\n'),
+    });
+    await runtimeSendMessage({
+      action: 'setBadge',
+      values: {
+        type: 'error',
+      },
+    });
+    return;
+  }
+
+  const patterns = workPatternsResponse.data;
+  patterns.unshift('');
+  const estimates = estimatesResponse.data;
+
+  createToolBox(doc, attendanceTable, patterns, yearMonth);
+
+  // 列ヘッダを追加する
+  const rows = Array.apply(null, attendanceTable.querySelectorAll('tbody>tr'));
+  const headElement = rows.shift();
+  for (let definition of columnDefinitions) {
+    const th = doc.createElement('th');
+    th.textContent = definition.header;
+    headElement.appendChild(th);
+  }
+
+  // 各行に列を追加する
+  for (let row of rows) {
+    const rowDate = getRowDate(row);
+    let data;
+    while (estimates.length) {
+      const estimate = estimates[0];
+      const estimateDate = estimate ? (moment(estimate.date).format('D') - 0) : 0;
+      if (estimateDate < rowDate) {
+        estimates.shift();
+      } else if (estimateDate === rowDate) {
+        // 行の日付と一致するデータを使う
+        data = estimates.shift();
+        break;
+      }
+    }
+
+    for (let definition of columnDefinitions) {
+      const td = doc.createElement('td');
+      if (definition.classes) {
+        for (let clazz of definition.classes) {
+          td.classList.add(clazz);
+        }
+      }
+      td.appendChild(definition.innerTag(doc, yearMonth.state, now, rowDate, row, data, patterns));
+      row.appendChild(td);
+    }
+  }
 }
 
 /* 報告書作成を拡張する */
@@ -558,7 +608,7 @@ const extendCreateReport = async (doc) => {
   });
 }
 
-// 画面に応じて処理分岐
+/* 画面に応じて処理分岐 */
 const steering = async () => {
   const items = await getChromeStorage('sync', ['ssl', 'host', 'port']);
   const host = items.host;
