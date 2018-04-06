@@ -380,7 +380,7 @@ const createExtendColumnDefinitions = () => {
       classes: ['right'],
       innerTag: (doc, viewState, now, rowDate, row, data) => {
         const tag = createTimePicker(doc, 'unclaim', now, viewState, rowDate);
-        if (data) tag.value = data.unclaimedHours === '00:00' ? '' : data.unclaimedHours;
+        if (data) tag.value = data.unclaimedHours === '0:00' ? '' : data.unclaimedHours;
         return tag;
       },
     },
@@ -446,28 +446,76 @@ const appendSummaryInfo = async (doc, summaryTable, now, yearMonth, user) => {
     });
     return;
   }
-  const summaryInfo = response.data ? response.data[user] : {};
-
+  const summaryInfo = response.data ? response.data : {};
+  const estimateSummaryInfo = summaryInfo.estimates[user];
+  const actualSummaryInfo = summaryInfo.actuals[user] || {};
   const th = doc.createElement('th');
-  // 予測行
-  const estimateSummaryInfo = summaryInfo.estimates;
-  const estimateRow = summaryTable.insertRow();
-  estimateRow.classList.add('alpha-attendance-summary-info');
-  // 予測請求稼働
-  const estimateLabel = th.cloneNode();
-  estimateLabel.textContent = '予測請求稼働';
-  estimateRow.appendChild(estimateLabel);
-  const estimateValue = estimateRow.insertCell();
-  estimateValue.textContent = estimateSummaryInfo.claimed;
 
-  // 実績行
-  const actualRow = summaryTable.insertRow();
-  actualRow.classList.add('alpha-attendance-summary-info');
-  // 請求稼働実績
-  const claimedActualLabel = th.cloneNode();
-  claimedActualLabel.textContent = '請求稼働実績';
-  actualRow.appendChild(claimedActualLabel);
-  const claimedActualValue = actualRow.insertCell();
+  const extendTableInfo = [
+    {type: 'tr'},
+    {
+      text: '請求稼働(予定)',
+      type: 'th',
+      classes: [],
+    },
+    {
+      text: estimateSummaryInfo ? estimateSummaryInfo.claimed : '0:00',
+      type: 'td',
+      classes: ['right'],
+    },
+    {
+      text: '非請求稼働(予定)',
+      type: 'th',
+      classes: [],
+    },
+    {
+      text: estimateSummaryInfo ? estimateSummaryInfo.unclaimed : '0:00',
+      type: 'td',
+      classes: ['right'],
+    },
+    {type: 'tr'},
+    {
+      text: '稼働実績',
+      type: 'th',
+      classes: [],
+      colSpan: 2,
+    },
+  ];
+
+  for (let pCode of Object.keys(actualSummaryInfo)) {
+    extendTableInfo.push({type: 'tr'});
+    extendTableInfo.push({
+      text: pCode,
+      type: 'th',
+      classes: [],
+    });
+    extendTableInfo.push({
+      text: actualSummaryInfo[pCode],
+      type: 'td',
+      classes: ['right'],
+    });
+  }
+
+  let row;
+  for (let info of extendTableInfo) {
+    if (info.type === 'tr') {
+      row = summaryTable.insertRow();
+      row.classList.add('alpha-attendance-summary-info');
+      continue;
+    }
+
+    let cell;
+    if (info.type === 'th') {
+      cell = th.cloneNode();
+      row.appendChild(cell);
+    } else {
+      cell = row.insertCell();
+    }
+    cell.textContent = info.text;
+    info.classes.forEach(clazz => cell.classList.add(clazz));
+    if (info.colSpan) cell.colSpan = info.colSpan;
+  }
+
 }
 
 /* 勤務表に列を追加する */
@@ -586,6 +634,7 @@ const extendCreateReport = async (doc) => {
     detail: detail,
   };
 
+  // 提出時にサーバに送信する
   submitButton.addEventListener('mousedown', async () => {
     if (!detail.length) return;
 
@@ -594,18 +643,11 @@ const extendCreateReport = async (doc) => {
       values: values,
     });
   });
+}
 
-  // 以下、test用
-  const saveButton = inputForm.querySelector('[value="保存"]');
-  if (!saveButton) return;
-  saveButton.addEventListener('mousedown', async () => {
-    if (!detail.length) return;
-
-    await runtimeSendMessage({
-      action: 'registerActual',
-      values: values,
-    });
-  });
+/* トップページを拡張する */
+const extendTopPage = async (doc, now) => {
+  // TODO: 全員分の予測と実績を一覧表示
 }
 
 /* 画面に応じて処理分岐 */
@@ -747,6 +789,9 @@ funcs.mainContent = (view, menu) => {
     } else if (title.startsWith('報告書作成')) {
       // 報告書作成
       await extendCreateReport(doc);
+    } else if (title === '勤務報告システム') {
+      // トップページ
+      await extendTopPage(doc, now);
     }
   });
 }
