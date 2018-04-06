@@ -537,9 +537,7 @@ const appendAttendanceColumns = async (responses, doc, attendanceTable, now, yea
     });
     await runtimeSendMessage({
       action: 'setBadge',
-      values: {
-        type: 'error',
-      },
+      values: {type: 'error'},
     });
     return;
   }
@@ -647,7 +645,68 @@ const extendCreateReport = async (doc) => {
 
 /* トップページを拡張する */
 const extendTopPage = async (doc, now) => {
-  // TODO: 全員分の予測と実績を一覧表示
+  const attendanceTable = doc.createElement('table');
+  attendanceTable.setAttribute('id', 'alpha-attendance-list-all');
+  attendanceTable.classList.add('alpha-attendance-table');
+
+  const columns = [
+    {
+      label: '社員番号',
+      rowSpan: 2,
+    },
+    {
+      label: '予測稼働時間',
+      subColumns: [
+        {label: '請求稼働'},
+        {label: '非請求稼働'},
+      ],
+    },
+    {
+      label: '稼働実績',
+      subColumns: [{}],
+    }
+  ];
+
+  const responses = await runtimeSendMessage({
+    action: 'getSummary',
+    values: {
+      year: now.year,
+      month: now.month,
+    },
+  });
+  if (responses.error) {
+    await setChromeStorage('local', {
+      status: responses.error,
+      message: responses.message,
+    });
+    await runtimeSendMessage({
+      action: 'setBadge',
+      values: {type: 'error'},
+    });
+    return;
+  }
+
+  const tBody = attendanceTable.createTBody();
+
+  // Header
+  const headRow = tBody.insertRow();
+  const subHeadRow = tBody.insertRow();
+  for (let column of columns) {
+    const th = doc.createElement('th');
+    th.textContent = column.label;
+    if (column.rowSpan) th.rowSpan = column.rowSpan;
+    if (column.subColumns) {
+      th.colSpan = column.subColumns.length;
+      for (let sub of column.subColumns) {
+        const th = doc.createElement('th');
+        th.textContent = sub.label;
+        subHeadRow.appendChild(th);
+      }
+    }
+    headRow.appendChild(th);
+  }
+
+  doc.body.insertBefore(attendanceTable, doc.getElementsByClassName('contents')[0].nextSibling);
 }
 
 /* 画面に応じて処理分岐 */
