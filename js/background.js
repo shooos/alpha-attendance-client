@@ -65,8 +65,13 @@ request.get = async (url, options) => {
   });
 
   if (response.status >= 400) {
-    throw new Error(response.statusText);
+    if (response.json) {
+      return response.json();
+    } else {
+      throw new Error(response.statusText);
+    }
   }
+
   return response.json();
 }
 request.post = async (url, data, options) => {
@@ -83,9 +88,14 @@ request.post = async (url, data, options) => {
     throw err;
   });
 
-  if (response.status >= 300) {
-    throw new Error(response.statusText);
+  if (response.status >= 400) {
+    if (response.json) {
+      return response.json();
+    } else {
+      throw new Error(response.statusText);
+    }
   }
+
   return response.json();
 }
 
@@ -152,7 +162,7 @@ actions.registerUser = async (sender, args, baseUrl) => {
       message: response.message,
     };
   } else {
-    response = await actions.login(sender, args, baseUrl, callback);
+    response = await actions.login(sender, args, baseUrl);
   }
 
   return response;
@@ -172,15 +182,15 @@ actions.login = async (sender, args, baseUrl) => {
     password: args.password,
   };
   const response = await request.post([baseUrl, 'user', 'login'].join('/'), data)
-    .catch((err) => {
-      popupBadge.setError();
-      result.status = 'LoginFailed';
-      if (err.name === 'TypeError') {
-        result.message = 'Login request failed.';
-      } else {
-        result.message = err.message;
-      }
-    });
+  .catch((err) => {
+    popupBadge.setError();
+    result.status = 'LoginFailed';
+    if (err.name === 'TypeError') {
+      result.message = 'Login request failed.';
+    } else {
+      result.message = err.message;
+    }
+  });
 
   if (response && response.error) {
     popupBadge.setError();
@@ -197,14 +207,15 @@ actions.login = async (sender, args, baseUrl) => {
 /* ログアウト */
 actions.logout = async (sender, args, baseUrl) => {
   await request.post([baseUrl, 'user', 'logout'].join('/'), {id: args.id})
-    .catch((err) => {
-      popupBadge.setError();
-      setChromeStorage({
-        status: 'LogoutFailed',
-        message: 'Logout failed.',
-      });
-      throw err;
+  .catch((err) => {
+    popupBadge.setError();
+    setChromeStorage({
+      status: 'LogoutFailed',
+      message: 'Logout failed.',
     });
+    throw err;
+  });
+
   return;
 }
 
@@ -242,6 +253,14 @@ actions.registerEstimates = async (sender, args, baseUrl) => {
   const headers = await createAutorizationHeader();
   const url = [baseUrl, 'attendance', 'estimate'].join('/');
   const response = await request.post(url, args, {headers: headers});
+  return response;
+}
+
+/* 実績を取得 */
+actions.getUserActuals = async (sender, args, baseUrl) => {
+  const headers = await createAutorizationHeader();
+  const url = [baseUrl, 'attendance', 'actuals', args.user, args.year, args.month].join('/');
+  const response = await request.get(url, {headers: headers});
   return response;
 }
 
@@ -291,6 +310,7 @@ chrome.runtime.onMessage.addListener((message, sender, callback) => {
           states: err.name,
           message: err.message,
         });
+        console.error(err);
         throw err;
       });
       callback(response);
@@ -306,6 +326,7 @@ chrome.runtime.onMessage.addListener((message, sender, callback) => {
           status: err.name,
           message: err.message,
         });
+        console.error(err);
         throw err;
       });
       callback(responses);

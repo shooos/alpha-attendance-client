@@ -179,6 +179,8 @@ const createBatchInputDialog = (doc, patterns) => {
 
 // 勤務表テーブル上部にツールボックスを生成する
 const createToolBox = (doc, table, patterns, yearMonth) => {
+  const indicator = new Indicator();
+
   const box = doc.createElement('div');
   box.classList.add('alpha-attendance-toolbox');
   const batchInputDialog = createBatchInputDialog(doc, patterns);
@@ -195,14 +197,20 @@ const createToolBox = (doc, table, patterns, yearMonth) => {
   const register = doc.createElement('div');
   register.classList.add('tool-item');
   register.textContent = '予定登録';
+
   register.addEventListener('mousedown', async () => {
+    indicator.show();
+
     const estimates = [];
     const trs = doc.querySelectorAll('body > table.alpha-attendance-table > tbody > tr');
 
     for (let tr of trs) {
       const dayOffTag = tr.querySelector('[name="day-off"]');
-      if (!dayOffTag) continue;
+      if (!dayOffTag) continue; // ヘッダ行を処理から除外する判定
+
       const patternTag = tr.querySelector('[name="pattern"]');
+      if (patternTag.readOnly) continue; // 過去日の行を無視する
+
       const pattern = patternTag.options[patternTag.selectedIndex].value;
       const startTag = tr.querySelector('[name="start"]');
       const endTag = tr.querySelector('[name="end"]');
@@ -227,13 +235,14 @@ const createToolBox = (doc, table, patterns, yearMonth) => {
         detail: estimates,
       },
     });
+    indicator.hide();
   });
   box.appendChild(register);
 
   const thead = table.createTHead();
   const headRow = thead.insertRow();
   const cell = headRow.insertCell();
-  cell.colSpan = 15;
+  cell.colSpan = 16;
   cell.appendChild(box);
 }
 
@@ -321,9 +330,25 @@ const getYearMonth = (doc, now) => {
 
 /* 追加列の定義を生成 */
 const createExtendColumnDefinitions = () => {
+  const isDayOff = (row) => {
+    const dayOff = row.querySelector('[name="day-off"]');
+    return dayOff.checked;
+  }
+
   return [
     {
+      header: '登録済',
+      type: 'actual',
+      classes: ['alpha-attendance-center'],
+      innerTag: (doc, data) => {
+        const tag = doc.createElement('span');
+        if (data) tag.classList.add('alpha-attendance-icon-checkmark');
+        return tag;
+      },
+    },
+    {
       header: '休暇(予定)',
+      type: 'estimate',
       classes: ['alpha-attendance-center'],
       innerTag: (doc, viewState, now, rowDate, row, data, patterns) => {
         const tag = doc.createElement('label');
@@ -335,6 +360,12 @@ const createExtendColumnDefinitions = () => {
 
         tag.addEventListener('change', () => {
           tag.style.background = checkbox.checked ? '#f99' : '';
+          const inputs = row.querySelectorAll('select, input');
+          for (let input of inputs) {
+            if (input !== checkbox) {
+              input.disabled = checkbox.checked;
+            }
+          }
         });
         tag.style.background = checkbox.checked ? '#f99' : '';
         tag.appendChild(checkbox);
@@ -344,8 +375,10 @@ const createExtendColumnDefinitions = () => {
     },
     {
       header: '形態(予定)',
+      type: 'estimate',
       innerTag: (doc, viewState, now, rowDate, row, data, patterns) => {
         const tag = createPatternSelector(doc, 'pattern', now, viewState, rowDate, patterns);
+
         if (data && tag.tagName === 'INPUT') {
           const pattern = patterns.filter((pattern) => pattern.workPatternId === data.workPatternId)[0];
           tag.value = pattern ? pattern.label : '';
@@ -354,38 +387,47 @@ const createExtendColumnDefinitions = () => {
           const list = Array.apply(null, tag.querySelectorAll('option'));
           tag.selectedIndex = list.indexOf(option);
         }
+
+        tag.disabled = isDayOff(row);
         return tag;
       },
     },
     {
       header: '開始(予定)',
+      type: 'estimate',
       classes: ['right'],
       innerTag: (doc, viewState, now, rowDate, row, data) => {
         const tag = createTimePicker(doc, 'start', now, viewState, rowDate);
         if (data) tag.value = data.startTime;
+        tag.disabled = isDayOff(row);
         return tag;
       },
     },
     {
       header: '終了(予定)',
+      type: 'estimate',
       classes: ['right'],
       innerTag: (doc, viewState, now, rowDate, row, data) => {
         const tag = createTimePicker(doc, 'end', now, viewState, rowDate);
         if (data) tag.value = data.endTime;
+        tag.disabled = isDayOff(row);
         return tag;
       },
     },
     {
       header: '非請求(予定)',
+      type: 'estimate',
       classes: ['right'],
       innerTag: (doc, viewState, now, rowDate, row, data) => {
         const tag = createTimePicker(doc, 'unclaim', now, viewState, rowDate);
         if (data) tag.value = data.unclaimedHours === '0:00' ? '' : data.unclaimedHours;
+        tag.disabled = isDayOff(row);
         return tag;
       },
     },
     {
       header: '稼働(予定)',
+      type: 'estimate',
       classes: ['right'],
       innerTag: (doc, viewState, now, rowDate, row, data) => {
         const tag = createTimePicker(doc, 'claim', null, 'PAST', null);
@@ -415,8 +457,12 @@ const extendAttendanceList = async (doc, now, yearMonth) => {
 
   // 勤務形態リストを取得する
   const responses = await runtimeSendMessage({
-    actions: ['getPatterns', 'getUserEstimates'],
+    actions: ['getPatterns', 'getUserEstimates', 'getUserActuals'],
     values: [{}, {
+      year: yearMonth.year,
+      month: yearMonth.month,
+      user: items.user,
+    }, {
       year: yearMonth.year,
       month: yearMonth.month,
       user: items.user,
@@ -525,11 +571,13 @@ const appendAttendanceColumns = async (responses, doc, attendanceTable, now, yea
 
   const workPatternsResponse = responses.shift();
   const estimatesResponse = responses.shift();
+  const actualsResponse = responses.shift();
 
-  if (workPatternsResponse.error || estimatesResponse.error) {
+  if (workPatternsResponse.error || estimatesResponse.error || actualsResponse.error) {
     const messages = [];
     workPatternsResponse.error && messages.push(workPatternsResponse.message);
     estimatesResponse.error && messages.push(estimatesResponse.message);
+    actualsResponse.error && messages.push(actualsResponse.message);
 
     await setChromeStorage('local', {
       status: 'GetEstimatesInfoFailed',
@@ -545,6 +593,7 @@ const appendAttendanceColumns = async (responses, doc, attendanceTable, now, yea
   const patterns = workPatternsResponse.data;
   patterns.unshift('');
   const estimates = estimatesResponse.data;
+  const actuals = actualsResponse.data;
 
   createToolBox(doc, attendanceTable, patterns, yearMonth);
 
@@ -560,17 +609,40 @@ const appendAttendanceColumns = async (responses, doc, attendanceTable, now, yea
   // 各行に列を追加する
   for (let row of rows) {
     const rowDate = getRowDate(row);
-    let data;
-    while (estimates.length) {
+    let estimateData;
+    let actualData;
+    let breakFlag = 0;
+
+    while (estimates.length || actuals.length) {
       const estimate = estimates[0];
-      const estimateDate = estimate ? (moment(estimate.date).format('D') - 0) : 0;
+      const estimateDate = estimate ? (moment(estimate.date).format('D') - 0) : 32;
+      const actual = actuals[0];
+      const actualDate = actual ? (moment(actual.date).format('D') - 0) : 32;
+
+      if (estimateDate > rowDate && actualDate > rowDate) {
+        // 対象日のデータでない場合はスキップ
+        break;
+      }
+
       if (estimateDate < rowDate) {
+        // 表示対象でないデータは読み捨てる
         estimates.shift();
       } else if (estimateDate === rowDate) {
         // 行の日付と一致するデータを使う
-        data = estimates.shift();
-        break;
+        estimateData = estimates.shift();
+        breakFlag |= 1;
       }
+
+      if (actualDate < rowDate) {
+        // 表示対象でないデータは読み捨てる
+        actuals.shift();
+      } else if (actualDate === rowDate) {
+        // 行の日付と一致するデータを使う
+        actualData = actuals.shift();
+        breakFlag |= 2;
+      }
+
+      if (breakFlag === 3) break;
     }
 
     for (let definition of columnDefinitions) {
@@ -580,7 +652,13 @@ const appendAttendanceColumns = async (responses, doc, attendanceTable, now, yea
           td.classList.add(clazz);
         }
       }
-      td.appendChild(definition.innerTag(doc, yearMonth.state, now, rowDate, row, data, patterns));
+
+      if (definition.type === 'actual') {
+        td.appendChild(definition.innerTag(doc, actualData));
+      } else {
+        td.appendChild(definition.innerTag(doc, yearMonth.state, now, rowDate, row, estimateData, patterns));
+      }
+
       row.appendChild(td);
     }
   }
@@ -588,9 +666,16 @@ const appendAttendanceColumns = async (responses, doc, attendanceTable, now, yea
 
 /* 報告書作成を拡張する */
 const extendCreateReport = async (doc) => {
+  const indicator = new Indicator();
+
   const inputForm = doc.forms['inputForm'];
-  const submitButton = inputForm.querySelector('[value="提出"]');
-  if (!submitButton) return;
+  let submitButton = inputForm.querySelector('[value="提出"]');
+  if (!submitButton) {
+    submitButton = doc.createElement('input');
+    submitButton.setAttribute('type', 'button');
+    submitButton.value = '再送信';
+    inputForm.appendChild(submitButton);
+  }
 
   const response = await runtimeSendMessage({
     action: 'getPatterns',
@@ -636,10 +721,12 @@ const extendCreateReport = async (doc) => {
   submitButton.addEventListener('mousedown', async () => {
     if (!detail.length) return;
 
+    indicator.show();
     await runtimeSendMessage({
       action: 'registerActual',
       values: values,
     });
+    indicator.hide();
   });
 }
 
@@ -663,7 +750,7 @@ const extendTopPage = async (doc, now) => {
     },
     {
       label: '稼働実績',
-      subColumns: [{}],
+      subColumns: [],
     }
   ];
 
@@ -686,6 +773,22 @@ const extendTopPage = async (doc, now) => {
     return;
   }
 
+  const data = responses.data;
+  const actuals = data.actuals;
+  const estimates = data.estimates;
+
+  // 全ユーザ分のP-Codeのリストを作る
+  const pCodeList = [];
+  for (let actual of Object.values(actuals)) {
+    Object.keys(actual).forEach(pCode => {
+      if (!pCodeList.includes(pCode)) {
+        pCodeList.push(pCode);
+      }
+    });
+  }
+  pCodeList.sort();
+  pCodeList.forEach(pCode => columns[2].subColumns.push({label: pCode}));
+
   const tBody = attendanceTable.createTBody();
 
   // Header
@@ -704,6 +807,38 @@ const extendTopPage = async (doc, now) => {
       }
     }
     headRow.appendChild(th);
+  }
+
+  // Body
+
+  // ユーザのリスト
+  const users = Object.keys(actuals);
+  Object.keys(estimates).forEach(userId => !users.includes(userId) && users.push(userId));
+  users.sort();
+
+  for (let user of users) {
+    const row = tBody.insertRow();
+    const cell = row.insertCell();
+    cell.textContent = user;
+
+    const estimate = estimates[user];
+    const claim = row.insertCell();
+    const unclaim = row.insertCell();
+    if (estimate) {
+      claim.textContent = estimate.claimed || '0:00';
+      claim.classList.add('right');
+      unclaim.textContent = estimate.unClaimed || '0:00';
+      unclaim.classList.add('right');
+    }
+
+    const actual = actuals[user];
+    for (let pCode of pCodeList) {
+      const cell = row.insertCell();
+      if (actual[pCode]) {
+        cell.textContent = actual[pCode];
+        cell.classList.add('right');
+      }
+    }
   }
 
   doc.body.insertBefore(attendanceTable, doc.getElementsByClassName('contents')[0].nextSibling);
@@ -743,11 +878,23 @@ const steering = async () => {
 const funcs = {};
 
 /* ログインページ */
-funcs.loginForm = (form) => {
+funcs.loginForm = async (form) => {
   const elements = form.elements;
   let userIDForm, passwordForm;
   const indicator = new Indicator();
 
+  indicator.show();
+  // ページオープン時にログイン情報が残っていたらログアウトする
+  const userInfo = await getChromeStorage('local', ['user', 'token']);
+  if (userInfo.user && userInfo.token) {
+    await runtimeSendMessage({
+      action: 'logout',
+      values: {id: userInfo.user},
+    });
+  }
+  indicator.hide();
+
+  // Login hook
   let preventEvent = true;
   form.addEventListener('submit', async (e) => {
     if (!preventEvent) return;
@@ -844,13 +991,14 @@ funcs.mainContent = (view, menu) => {
     if (title.startsWith('勤務表')) {
       // 勤務表
       const yearMonth = getYearMonth(doc, now);
-      await extendAttendanceList(doc, now, yearMonth);
+      await extendAttendanceList(doc, now, yearMonth)
+      .catch(err => console.error(err));
     } else if (title.startsWith('報告書作成')) {
       // 報告書作成
-      await extendCreateReport(doc);
-    } else if (title === '勤務報告システム') {
+      await extendCreateReport(doc).catch(err => console.error(err));
+    } else if (title === '勤務報告システム' && !doc.getElementById('j_idt3')) {
       // トップページ
-      await extendTopPage(doc, now);
+      await extendTopPage(doc, now).catch(err => console.error(err));
     }
   });
 }

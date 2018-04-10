@@ -1,5 +1,4 @@
 ﻿const elements = {
-  status: document.getElementById('status'),
   user: document.getElementById('user'),
   message: document.getElementById('message'),
   btnLogin: document.getElementById('btn-login'),
@@ -83,7 +82,6 @@ const indicator = new Indicator();
 
 // 画面描画処理
 const render = (args) => {
-  elements.status.value = args.status || '';
   elements.user.value = args.user || '';
   elements.message.value = args.message || '';
 
@@ -98,7 +96,6 @@ const render = (args) => {
 
   switch (args.status) {
   case 'Success':
-  case 'AlreadyLoginError':
   case 'LoggedIn':
     popupBadge.setSuccess();
     break;
@@ -116,6 +113,8 @@ const render = (args) => {
     popupBadge.setError();
     break;
   case 'LoginFailed':
+  case 'AuthenticationError':
+  case 'AuthorizationRequired':
     elements.btnLogin.classList.remove('hidden');
     elements.message.classList.add('error');
     popupBadge.setError();
