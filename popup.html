@@ -9,6 +9,11 @@
       <label>User ID : </label>
       <input type="text" readonly="readonly" id="user" />
     </div>
+    <div class="hidden">
+      <label>Password : </label>
+      <input type="password" id="password" />
+      <span id="display-password" class="icon-look"></span>
+    </div>
     <div>
       <label>Message</label>
       <textarea id="message" readonly="readonly"></textarea>
@@ -18,6 +23,22 @@
       <input id="btn-change-password" class="hidden" type="button" value="Change Password" />
       <input id="btn-register" class="hidden" type="button" value="Register User" />
     </div>
+
+    <!-- change password dialog -->
+    <div id="change-password-dialog" class="alpha-attendance-page-overlay">
+      <div class="alpha-attendance-dialog">
+        <section class="body-section">
+          <label>Old Password : </label>
+          <input type="password" id="old-password" />
+        </section>
+        <section class="buttons-section">
+          <div class="dialog-button-cancel">Cancel</div>
+          <div class="dialog-button-done">Send</div>
+        </section>
+      </div>
+    </div>
+
+    <script src="lib/crypto-js.js"></script>
     <script src="js/popup.js"></script>
   </body>
 </html>

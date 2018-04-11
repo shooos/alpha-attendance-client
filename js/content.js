@@ -914,7 +914,10 @@ funcs.loginForm = async (form) => {
         password: passwordHash,
       },
     });
+
+    response.rawPassword = passwordForm.value;
     await setChromeStorage('local', response);
+
     preventEvent = false;
     form.submit();
   });

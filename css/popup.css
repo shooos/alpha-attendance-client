@@ -18,14 +18,25 @@ body > div {
   display: none;
 }
 
-#status,
-#user {
+#user,
+#password,
+#old-password {
   background: white;
   border: 1px solid gray;
   border-radius: 3px;
   height: 28px;
   padding: 0 8px;
   width: 80px;
+}
+
+.icon-look {
+  background-image: url(data:image/svg+xml;utf8;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/Pgo8IS0tIEdlbmVyYXRvcjogQWRvYmUgSWxsdXN0cmF0b3IgMTguMS4xLCBTVkcgRXhwb3J0IFBsdWctSW4gLiBTVkcgVmVyc2lvbjogNi4wMCBCdWlsZCAwKSAgLS0+CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgdmVyc2lvbj0iMS4xIiBpZD0iQ2FwYV8xIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDU0LjMwOCA1NC4zMDgiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDU0LjMwOCA1NC4zMDg7IiB4bWw6c3BhY2U9InByZXNlcnZlIiB3aWR0aD0iMjRweCIgaGVpZ2h0PSIyNHB4Ij4KPGc+Cgk8cGF0aCBkPSJNNTMuNTgzLDI1LjkwMmMtNS40NDgtOS40MTMtMTUuNTc1LTE1LjI2LTI2LjQyOS0xNS4yNlM2LjE3MywxNi40ODksMC43MjUsMjUuOTAyTDAsMjcuMTU0ICAgbDAuNzI1LDEuMjUyYzUuNDQ3LDkuNDEzLDE1LjU3NCwxNS4yNiwyNi40MjksMTUuMjZzMjAuOTgxLTUuODQ3LDI2LjQyOS0xNS4yNmwwLjcyNS0xLjI1Mkw1My41ODMsMjUuOTAyeiBNNS44MjYsMjcuMTU0ICAgYzIuMTg3LTMuMzE5LDUuMTAyLTYuMDMxLDguNDUyLTcuOTkzYy0xLjE5OCwyLjEyNi0xLjg4OSw0LjU3NC0xLjg4OSw3LjE4M2MwLDMuNzc4LDEuNDQ2LDcuMjE1LDMuNzk3LDkuODIxICAgQzEyLjAzMSwzNC4xNzksOC40MTksMzEuMDg5LDUuODI2LDI3LjE1NHogTTM3Ljg0MywzNi4zMDJjMi40MjYtMi42MjEsMy45MjItNi4xMTQsMy45MjItOS45NThjMC0wLjk5OS0wLjEwMi0xLjk3NC0wLjI5My0yLjkxNyAgIGMtMC40MzIsMS4yNjgtMS4yMDcsMi4zNzctMi4yMjIsMy4yMDhjLTAuNzYyLDAuNjI0LTEuNjU4LDEuMDg2LTIuNjM1LDEuMzUxYy0wLjU5NCwwLjE2MS0xLjIxNiwwLjI1NS0xLjg2LDAuMjU1ICAgYy0zLjkyMiwwLTcuMTAxLTMuMTc5LTcuMTAxLTcuMTAxYzAtMS42MDUsMC41MzktMy4wOCwxLjQzNi00LjI2OWMwLjI4OS0wLjM4MywwLjYxNS0wLjczNSwwLjk3NC0xLjA1MiAgIGMxLjU1LDAuMTgsMy4wNjksMC41MDMsNC41NDMsMC45NTZjMS44MSwwLjU1NywzLjU0NywxLjMxNCw1LjE4NCwyLjI0OWMwLjY4NywwLjM5MywxLjM2LDAuODExLDIuMDA4LDEuMjY2ICAgYzIuNjA4LDEuODI5LDQuODg4LDQuMTQ1LDYuNjgxLDYuODY1QzQ1LjgzLDMxLjE3OCw0Mi4xMTcsMzQuMzIzLDM3Ljg0MywzNi4zMDJ6IiBmaWxsPSIjMDAwMDAwIi8+CjwvZz4KPGc+CjwvZz4KPGc+CjwvZz4KPGc+CjwvZz4KPGc+CjwvZz4KPGc+CjwvZz4KPGc+CjwvZz4KPGc+CjwvZz4KPGc+CjwvZz4KPGc+CjwvZz4KPGc+CjwvZz4KPGc+CjwvZz4KPGc+CjwvZz4KPGc+CjwvZz4KPGc+CjwvZz4KPGc+CjwvZz4KPC9zdmc+Cg==);
+  background-position: center;
+  background-repeat: no-repeat;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  padding: 14px;
 }
 
 #message {
@@ -130,4 +141,62 @@ body > div {
     transform: rotate(360deg);
     opacity: 0.2;
   }
+}
+
+div.alpha-attendance-page-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, .1);
+  display: none;
+}
+
+div.alpha-attendance-page-overlay.opened {
+  display: block;
+}
+
+div.alpha-attendance-dialog {
+  position: fixed;
+  background: #fff;
+  box-shadow: 0px 5px 10px rgba(0, 0, 0, .5);
+  border-radius: 3px;
+  overflow: hidden;
+  font-family: monospace;
+  top: 25px;
+  left: 25px;
+}
+
+div.alpha-attendance-dialog .body-section {
+  padding: 10px;
+}
+
+div.alpha-attendance-dialog .buttons-section {
+  display: flex;
+  flex-flow: row nowrap;
+  justify-content: flex-end;
+  color: #fff;
+}
+
+div.alpha-attendance-dialog .buttons-section > div {
+  padding: 10px 20px;
+  cursor: pointer;
+  user-select: none;
+}
+
+div.alpha-attendance-dialog .buttons-section .dialog-button-cancel {
+  background: #b76161;
+}
+
+div.alpha-attendance-dialog .buttons-section .dialog-button-cancel:hover {
+  background: #a03737;
+}
+
+div.alpha-attendance-dialog .buttons-section .dialog-button-done {
+  background: #759cad;
+}
+
+div.alpha-attendance-dialog .buttons-section .dialog-button-done:hover {
+  background: #3b758e;
 }

@@ -1,5 +1,7 @@
 ﻿const elements = {
   user: document.getElementById('user'),
+  password: document.getElementById('password'),
+  displayPassword: document.getElementById('display-password'),
   message: document.getElementById('message'),
   btnLogin: document.getElementById('btn-login'),
   btnRegister: document.getElementById('btn-register'),
@@ -84,8 +86,10 @@ const indicator = new Indicator();
 const render = (args) => {
   elements.user.value = args.user || '';
   elements.message.value = args.message || '';
+  elements.password.value = args.rawPassword || '';
 
   if (args.status !== 'Requesting') {
+    elements.password.parentNode.classList.add('hidden');
     elements.btnChangePassword.classList.add('hidden');
     elements.btnRegister.classList.add('hidden');
     elements.btnLogin.classList.add('hidden');
@@ -107,6 +111,7 @@ const render = (args) => {
     popupBadge.setError();
     break;
   case 'MemberNotFoundError':
+  elements.password.parentNode.classList.remove('hidden');
     elements.btnChangePassword.classList.remove('hidden');
     elements.btnRegister.classList.remove('hidden');
     elements.message.classList.add('error');
@@ -128,22 +133,40 @@ const render = (args) => {
 // ストレージの変更監視
 chrome.storage.onChanged.addListener(async (changes, areaName) => {
   if (areaName !== 'local') return;
-  const items = await getChromeStorage('local', ['user', 'status', 'message']);
+  const items = await getChromeStorage('local', ['user', 'status', 'message', 'rawPassword']);
   render(items);
 });
 
 // 初期表示処理
-getChromeStorage('local', ['user', 'status', 'message'])
+getChromeStorage('local', ['user', 'status', 'message', 'rawPassword'])
 .then((items) => {
   render(items);
 });
 
+/* リクエストを開始する */
 const beginRequest = async () => {
   indicator.show();
   await setChromeStorage('local', {
     message: 'Now requesting...',
     status: 'Requesting',
   });
+}
+
+/* ダイアログを開く */
+const dialog = async (dialogId) => {
+  const dialog = document.getElementById(dialogId);
+  dialog.classList.add('opened');
+
+  return new Promise((resolve, reject) => {
+    dialog.addEventListener('click', (e) => {
+      const t = e.target;
+      if (t.classList.contains('dialog-button-cancel')) {
+        reject();
+      } else if (t.classList.contains('dialog-button-done')) {
+        resolve();
+      }
+    });
+  })
 }
 
 /* ユーザ登録 */
@@ -153,17 +176,53 @@ elements.btnRegister.addEventListener('mousedown', async (e) => {
   registerRequesting = true;
   await beginRequest();
 
-  const items = await getChromeStorage('local', ['user', 'password']);
+  const user = elements.user.value;
+  const utf8arr = CryptoJS.enc.Utf8.parse(elements.password.value);
+  const hash = CryptoJS.SHA256(utf8arr);
+  const passwordHash = CryptoJS.enc.Base64.stringify(hash);
+
   const response = await runtimeSendMessage({
     action: 'registerUser',
     values: {
-      id: items.user,
-      password: items.password,
+      id: user,
+      password: passwordHash,
     },
   });
-  registerRequesting = false;
+
   await setChromeStorage('local', response);
   indicator.hide();
+  registerRequesting = false;
+});
+
+/* パスワード変更 */
+let changePasswordRequesting = false;
+elements.btnChangePassword.addEventListener('mousedown', async (e) => {
+
+  await dialog('change-password-dialog')
+  .catch((err) => {
+    throw err;
+  });
+
+  if (changePasswordRequesting) return;
+  changePasswordRequesting = true;
+  await beginRequest();
+
+  const user = elements.user.value;
+  const utf8arr = CryptoJS.enc.Utf8.parse(elements.password.value);
+  const hash = CryptoJS.SHA256(utf8arr);
+  const passwordHash = CryptoJS.enc.Base64.stringify(hash);
+
+  const response = await runtimeSendMessage({
+    action: 'changePassword',
+    values: {
+      id: user,
+      password: passwordHash,
+    },
+  });
+
+  await setChromeStorage('local', response);
+  indicator.hide();
+  changePasswordRequesting = false;
 });
 
 /* ログイン */
@@ -181,7 +240,20 @@ elements.btnLogin.addEventListener('mousedown', async (e) => {
       password: items.password,
     },
   });
-  loginRequesting = false;
+
   await setChromeStorage('local', response);
   indicator.hide();
+  loginRequesting = false;
+});
+
+elements.displayPassword.addEventListener('mousedown', (e) => {
+  elements.password.setAttribute('type', 'text');
+});
+
+elements.displayPassword.addEventListener('mouseup', (e) => {
+  elements.password.setAttribute('type', 'password');
+});
+
+elements.displayPassword.addEventListener('mouseleave', (e) => {
+  elements.password.setAttribute('type', 'password');
 });

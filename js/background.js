@@ -149,16 +149,46 @@ actions.registerUser = async (sender, args, baseUrl) => {
     id: args.id,
     password: args.password,
   };
-  let response = await request.post([baseUrl, 'user', 'register'].join('/'), data)
-    .catch((err) => {
-      response = {
-        status: 'RegisterUserFailed',
-        message: response.message,
-      };
-    });
+
+  let response = await request.post([baseUrl, 'user'].join('/'), data)
+  .catch((err) => {
+    response = {
+      status: 'RegisterUserFailed',
+      message: response.message,
+    };
+  });
+
   if (response.err) {
     response = {
       status: 'RegisterUserFailed',
+      message: response.message,
+    };
+  } else {
+    response = await actions.login(sender, args, baseUrl);
+  }
+
+  return response;
+}
+
+/* パスワード変更 */
+actions.changePassword = async (sender, args, baseUrl) => {
+  const data = {
+    id: args.id,
+    oldInfo: args.oldInfo,
+    newInfo: args.newInfo,
+  };
+
+  let response = await request.put([baseUrl, 'user'].join('/'), data)
+  .catch((err) => {
+    response = {
+      status: err.name,
+      message: response.message,
+    };
+  });
+
+  if (response.err) {
+    response = {
+      status: response.err,
       message: response.message,
     };
   } else {
