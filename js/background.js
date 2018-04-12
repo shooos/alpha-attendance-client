@@ -98,6 +98,30 @@ request.post = async (url, data, options) => {
 
   return response.json();
 }
+request.put = async (url, data, options) => {
+  const headers = {'Content-Type': 'application/json'};
+  if (options && options.headers) {
+    Object.assign(headers, options.headers);
+  }
+
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: headers,
+    body: JSON.stringify(data),
+  }).catch((err) => {
+    throw err;
+  });
+
+  if (response.status >= 400) {
+    if (response.json) {
+      return response.json();
+    } else {
+      throw new Error(response.statusText);
+    }
+  }
+
+  return response.json();
+}
 
 // 認証ヘッダ作成
 const createAutorizationHeader = async () => {
@@ -152,7 +176,7 @@ actions.registerUser = async (sender, args, baseUrl) => {
 
   let response = await request.post([baseUrl, 'user'].join('/'), data)
   .catch((err) => {
-    response = {
+    return {
       status: 'RegisterUserFailed',
       message: response.message,
     };
@@ -180,7 +204,7 @@ actions.changePassword = async (sender, args, baseUrl) => {
 
   let response = await request.put([baseUrl, 'user'].join('/'), data)
   .catch((err) => {
-    response = {
+    return {
       status: err.name,
       message: response.message,
     };
@@ -213,13 +237,10 @@ actions.login = async (sender, args, baseUrl) => {
   };
   const response = await request.post([baseUrl, 'user', 'login'].join('/'), data)
   .catch((err) => {
-    popupBadge.setError();
-    result.status = 'LoginFailed';
-    if (err.name === 'TypeError') {
-      result.message = 'Login request failed.';
-    } else {
-      result.message = err.message;
-    }
+    return {
+      error: 'LoginFailed',
+      message: err.name === 'TypeError' ? 'Login request failed.' : err.message,
+    };
   });
 
   if (response && response.error) {
@@ -320,7 +341,6 @@ actions.getSummary = async (sender, args, baseUrl) => {
 
 /* メッセージリスナ */
 chrome.runtime.onMessage.addListener((message, sender, callback) => {
-  console.log('onMessage', message, sender, callback);
   chrome.storage.sync.get(['ssl', 'host', 'port'], async (items) => {
     const host = items.host;
     const port = items.port;
@@ -335,13 +355,10 @@ chrome.runtime.onMessage.addListener((message, sender, callback) => {
     if (message.action) {
       const response = await actions[message.action](sender, message.values, baseUrl.join('/'))
       .catch((err) => {
-        popupBadge.setError();
-        setChromeStorage('local', {
-          states: err.name,
+        return {
+          status: err.name,
           message: err.message,
-        });
-        console.error(err);
-        throw err;
+        };
       });
       callback(response);
     } else if (message.actions) {
@@ -351,13 +368,10 @@ chrome.runtime.onMessage.addListener((message, sender, callback) => {
       });
       const responses = await Promise.all(actionList)
       .catch((err) => {
-        popupBadge.setError();
-        setChromeStorage('local', {
+        return {
           status: err.name,
           message: err.message,
-        });
-        console.error(err);
-        throw err;
+        };
       });
       callback(responses);
     }

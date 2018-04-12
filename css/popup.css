@@ -200,3 +200,7 @@ div.alpha-attendance-dialog .buttons-section .dialog-button-done {
 div.alpha-attendance-dialog .buttons-section .dialog-button-done:hover {
   background: #3b758e;
 }
+
+input.required-error {
+  background: #ec8282!important;
+}

@@ -133,6 +133,7 @@ const render = (args) => {
 // ストレージの変更監視
 chrome.storage.onChanged.addListener(async (changes, areaName) => {
   if (areaName !== 'local') return;
+
   const items = await getChromeStorage('local', ['user', 'status', 'message', 'rawPassword']);
   render(items);
 });
@@ -156,13 +157,16 @@ const beginRequest = async () => {
 const dialog = async (dialogId) => {
   const dialog = document.getElementById(dialogId);
   dialog.classList.add('opened');
+  dialog.querySelector('#old-password').value = '';
 
   return new Promise((resolve, reject) => {
     dialog.addEventListener('click', (e) => {
       const t = e.target;
       if (t.classList.contains('dialog-button-cancel')) {
+        dialog.classList.remove('opened');
         reject();
       } else if (t.classList.contains('dialog-button-done')) {
+        dialog.classList.remove('opened');
         resolve();
       }
     });
@@ -197,18 +201,24 @@ elements.btnRegister.addEventListener('mousedown', async (e) => {
 /* パスワード変更 */
 let changePasswordRequesting = false;
 elements.btnChangePassword.addEventListener('mousedown', async (e) => {
+  const password = elements.password.value;
+  if (!password) {
+    elements.password.classList.add('required-error');
+    return;
+  }
 
-  await dialog('change-password-dialog')
-  .catch((err) => {
-    throw err;
-  });
+  try {
+    await dialog('change-password-dialog');
+  } catch (e) {
+    return;
+  }
 
   if (changePasswordRequesting) return;
   changePasswordRequesting = true;
   await beginRequest();
 
   const user = elements.user.value;
-  const utf8arr = CryptoJS.enc.Utf8.parse(elements.password.value);
+  const utf8arr = CryptoJS.enc.Utf8.parse(password);
   const hash = CryptoJS.SHA256(utf8arr);
   const passwordHash = CryptoJS.enc.Base64.stringify(hash);
 
@@ -218,6 +228,11 @@ elements.btnChangePassword.addEventListener('mousedown', async (e) => {
       id: user,
       password: passwordHash,
     },
+  }).catch((err) => {
+    return {
+      status: err.name,
+      message: err.message,
+    };
   });
 
   await setChromeStorage('local', response);
@@ -256,4 +271,8 @@ elements.displayPassword.addEventListener('mouseup', (e) => {
 
 elements.displayPassword.addEventListener('mouseleave', (e) => {
   elements.password.setAttribute('type', 'password');
+});
+
+elements.password.addEventListener('input', (e) => {
+  elements.password.classList.remove('required-error');
 });
