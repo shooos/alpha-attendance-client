@@ -43,13 +43,8 @@ const request = {};
 request.head = async (url, options) => {
   const response = await fetch(url, {
     method: 'HEAD'
-  }).catch((err) => {
-    throw err;
   });
-
-  if (response.status != 200) {
-    throw new Error(response.statusText);
-  }
+  if (!response.ok) throw new Error(response.statusText);
 }
 request.get = async (url, options) => {
   const headers = {'Content-Type': 'application/json'};
@@ -60,18 +55,10 @@ request.get = async (url, options) => {
   const response = await fetch(url, {
     method: 'GET',
     headers: headers,
-  }).catch((err) => {
-    throw err;
   });
+  if (!response.ok) throw new Error(response.statusText);
 
-  if (response.status >= 400) {
-    if (response.json) {
-      return response.json();
-    } else {
-      throw new Error(response.statusText);
-    }
-  }
-
+  if (headers['Content-Type'] === 'text/plain') return response.text();
   return response.json();
 }
 request.post = async (url, data, options) => {
@@ -84,17 +71,8 @@ request.post = async (url, data, options) => {
     method: 'POST',
     headers: headers,
     body: JSON.stringify(data),
-  }).catch((err) => {
-    throw err;
   });
-
-  if (response.status >= 400) {
-    if (response.json) {
-      return response.json();
-    } else {
-      throw new Error(response.statusText);
-    }
-  }
+  if (!response.ok) throw new Error(response.statusText);
 
   return response.json();
 }
@@ -108,17 +86,8 @@ request.put = async (url, data, options) => {
     method: 'PUT',
     headers: headers,
     body: JSON.stringify(data),
-  }).catch((err) => {
-    throw err;
   });
-
-  if (response.status >= 400) {
-    if (response.json) {
-      return response.json();
-    } else {
-      throw new Error(response.statusText);
-    }
-  }
+  if (!response.ok) throw new Error(response.statusText);
 
   return response.json();
 }
@@ -165,6 +134,17 @@ actions.connection = async (sender, args, baseUrl) => {
     throw err;
   });
   return;
+}
+
+/* スタイルシートを取得 */
+actions.getStyleSheet = async (sender, args, baseUrl) => {
+  const url = baseUrl.split('/').slice(0, -1).join('/');
+  const response = await request.get([url, 'css', 'attendance.css'].join('/'), {headers: {'Content-Type': 'text/plain'}})
+  .catch((err) => {
+    return '';
+  });
+
+  return response;
 }
 
 /* ユーザ登録 */

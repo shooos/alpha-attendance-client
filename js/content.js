@@ -985,11 +985,10 @@ funcs.mainContent = (view, menu) => {
     const title = doc.title;
 
     // Style Sheet を埋め込む
-    const link = doc.createElement('link');
-    link.setAttribute('rel', 'stylesheet');
-    link.setAttribute('type', 'text/css');
-    link.setAttribute('href', [baseUrl, 'css/attendance.css'].join('/'));
-    doc.head.appendChild(link);
+    const style = doc.createElement('style');
+    const styleSheet = await runtimeSendMessage({action: 'getStyleSheet'});
+    style.textContent = styleSheet;
+    doc.head.appendChild(style);
 
     if (title.startsWith('勤務表')) {
       // 勤務表

@@ -87,7 +87,7 @@ const render = (args) => {
   elements.user.value = args.user || '';
   elements.message.value = args.message || '';
   elements.password.value = args.rawPassword || '';
-
+console.log(args.status);
   if (args.status !== 'Requesting') {
     elements.password.parentNode.classList.add('hidden');
     elements.btnChangePassword.classList.add('hidden');
