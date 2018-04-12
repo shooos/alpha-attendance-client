@@ -177,6 +177,26 @@ const createBatchInputDialog = (doc, patterns) => {
   }
 }
 
+/* 登録結果を反映する */
+const reflectRegisterResponse = (doc, response) => {
+  if (!response || response.error) return;
+
+  const trs = Array.apply(null, doc.querySelectorAll('body > table.alpha-attendance-table tbody > tr:not(.stateRecognition):not(.statePresent)'));
+  trs.shift(); // ヘッダ行を捨てる
+  const data = response.data;
+  for (let tr of trs) {
+    const rowDate = getRowDate(tr);
+    const record = data.find((rec) => {
+      const date = moment(rec[0].date).format('D') - 0;
+      return date === rowDate;
+    });
+
+    if (record) {
+      tr.querySelector('[name="claim"]').value = record[0].estimateHours;
+    }
+  }
+}
+
 // 勤務表テーブル上部にツールボックスを生成する
 const createToolBox = (doc, table, patterns, yearMonth) => {
   const indicator = new Indicator();
@@ -228,13 +248,15 @@ const createToolBox = (doc, table, patterns, yearMonth) => {
     }
 
     const items = await getChromeStorage('local', ['user']);
-    await runtimeSendMessage({
+    const response = await runtimeSendMessage({
       action: 'registerEstimates',
       values: {
         memberId: items.user,
         detail: estimates,
       },
     });
+
+    reflectRegisterResponse(doc, response);
     indicator.hide();
   });
   box.appendChild(register);
@@ -761,6 +783,7 @@ const extendTopPage = async (doc, now) => {
       month: now.month,
     },
   });
+  if (!responses) return;
   if (responses.error) {
     await setChromeStorage('local', {
       status: responses.error,

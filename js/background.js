@@ -96,7 +96,7 @@ request.put = async (url, data, options) => {
 const createAutorizationHeader = async () => {
   const items = await getChromeStorage('local', ['token']);
   const token = items.token;
-  if (!token) return {};
+  if (!token) return null;
   return {'authorization': 'Bearer ' + token};
 }
 
@@ -253,6 +253,7 @@ actions.logout = async (sender, args, baseUrl) => {
 /* 勤務形態登録 */
 actions.registerWorkPattern = async (sender, args, baseUrl) => {
   const headers = await createAutorizationHeader();
+  if (!headers) return null;
   const response = await request.post([baseUrl, 'workPattern', 'register'].join('/'), args, {headers: headers});
   return response;
 }
@@ -260,6 +261,7 @@ actions.registerWorkPattern = async (sender, args, baseUrl) => {
 /* 勤務形態取得 */
 actions.getWorkPattern = async (sender, args, baseUrl) => {
   const headers = await createAutorizationHeader();
+  if (!headers) return null;
   const response = await request.get([baseUrl, 'workPattern', 'id', args.id].join('/'), {headers: headers});
   return response;
 }
@@ -267,6 +269,7 @@ actions.getWorkPattern = async (sender, args, baseUrl) => {
 /* 勤務形態リスト取得 */
 actions.getPatterns = async (sender, args, baseUrl) => {
   const headers = await createAutorizationHeader();
+  if (!headers) return null;
   const response = await request.get([baseUrl, 'workPattern', 'list'].join('/'), {headers: headers});
   return response;
 }
@@ -282,6 +285,7 @@ actions.getUserEstimates = async (sender, args, baseUrl) => {
 /* 稼働予定を登録 */
 actions.registerEstimates = async (sender, args, baseUrl) => {
   const headers = await createAutorizationHeader();
+  if (!headers) return null;
   const url = [baseUrl, 'attendance', 'estimate'].join('/');
   const response = await request.post(url, args, {headers: headers});
   return response;
@@ -290,6 +294,7 @@ actions.registerEstimates = async (sender, args, baseUrl) => {
 /* 実績を取得 */
 actions.getUserActuals = async (sender, args, baseUrl) => {
   const headers = await createAutorizationHeader();
+  if (!headers) return null;
   const url = [baseUrl, 'attendance', 'actuals', args.user, args.year, args.month].join('/');
   const response = await request.get(url, {headers: headers});
   return response;
@@ -298,6 +303,7 @@ actions.getUserActuals = async (sender, args, baseUrl) => {
 /* 実績を登録 */
 actions.registerActual = async (sender, args, baseUrl) => {
   const headers = await createAutorizationHeader();
+  if (!headers) return null;
   const url = [baseUrl, 'attendance', 'actual'].join('/');
   const response = await request.post(url, args, {headers: headers});
   return response;
@@ -306,6 +312,7 @@ actions.registerActual = async (sender, args, baseUrl) => {
 /* 稼働月間サマリを取得 */
 actions.getSummary = async (sender, args, baseUrl) => {
   const headers = await createAutorizationHeader();
+  if (!headers) return null;
   const path = [baseUrl, 'attendance', 'summary', args.year, args.month];
   args.user && path.push(args.user);
   const url = path.join('/');
