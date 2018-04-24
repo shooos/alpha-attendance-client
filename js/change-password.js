@@ -68,13 +68,14 @@ const toSHA256 = (str) => {
 }
 
 const form = document.forms['changePasswordForm'];
+const submitButton = form['changePasswordForm-j_idt32'];
 const indicator = new Indicator();
 let eventPrevent = true;
 
 const next = () => {
   eventPrevent = false;
   indicator.hide();
-  form.submit();
+  submitButton.click();
 }
 
 form.addEventListener('submit', async (e) => {
