@@ -61,7 +61,7 @@ actions.getStyleSheet = async (sender, args, baseUrl) => {
 
 /* ユーザ認証 */
 actions.signIn = async (sender, args, baseUrl) => {
-  const data = {id: args.user};
+  const data = {id: args.id};
 
   const response = await request.post([baseUrl, 'user'].join('/'), null, data)
   .catch((err) => ({
@@ -75,21 +75,6 @@ actions.signIn = async (sender, args, baseUrl) => {
   }
 
   return response;
-}
-
-/* ログアウト */
-actions.logout = async (sender, args, baseUrl) => {
-  await request.post([baseUrl, 'user', 'logout'].join('/'), null, {id: args.id})
-  .catch((err) => {
-    popupBadge.setError();
-    setChromeStorage({
-      status: 'LogoutFailed',
-      message: 'Logout failed.',
-    });
-    throw err;
-  });
-
-  return;
 }
 
 /* 勤務形態登録 */

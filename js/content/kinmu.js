@@ -1,45 +1,6 @@
 /* Global variable */
 let baseUrl;
 
-// chrome.storage.%area%.get を promise で包んだもの
-const getChromeStorage = async (area, keys) => {
-  return new Promise((resolve, reject) => {
-    try {
-      chrome.storage[area].get(keys, (items) => {
-        resolve(items);
-      });
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-// chrome.storage.%area%.set を promise で包んだもの
-const setChromeStorage = async (area, items) => {
-  return new Promise((resolve, reject) => {
-    try {
-      chrome.storage[area].set(items, () => {
-        resolve();
-      });
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-// chrome.runtime.sendMessage を promise で包んだもの
-const runtimeSendMessage = async (message) => {
-  return new Promise((resolve, reject) => {
-    try {
-      chrome.runtime.sendMessage(message, (response) => {
-        resolve(response);
-      });
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
 const Indicator = function () {
   this.loader = document.createElement('div');
   this.loader.classList.add('alpha-attendance-loader');
@@ -752,15 +713,19 @@ const extendCreateReport = async (doc) => {
   });
 }
 
-/* トップページを拡張する */
-const extendTopPage = async (doc, now) => {
+/* 全員分のサマリ情報テーブルを追加する */
+const appendAllMembersSummary = async (doc, yearMonth) => {
   const attendanceTable = doc.createElement('table');
-  attendanceTable.setAttribute('id', 'alpha-attendance-list-all');
+  attendanceTable.setAttribute('id', 'alpha-attendance-list-all-' + yearMonth.month);
   attendanceTable.classList.add('alpha-attendance-table');
+
+  const caption = attendanceTable.createCaption();
+  caption.textContent = yearMonth.month + '月';
+  caption.classList.add('alpha-attendance-table-caption');
 
   const columns = [
     {
-      label: '社員番号',
+      label: 'ユーザID',
       rowSpan: 2,
     },
     {
@@ -779,8 +744,8 @@ const extendTopPage = async (doc, now) => {
   const responses = await runtimeSendMessage({
     action: 'getSummary',
     values: {
-      year: now.year,
-      month: now.month,
+      year: yearMonth.year,
+      month: yearMonth.month,
     },
   });
   if (!responses) return;
@@ -811,6 +776,7 @@ const extendTopPage = async (doc, now) => {
   }
   pCodeList.sort();
   pCodeList.forEach(pCode => columns[2].subColumns.push({label: pCode}));
+  if (!pCodeList.length) columns[2].subColumns.push({label: ''});
 
   const tBody = attendanceTable.createTBody();
 
@@ -862,9 +828,19 @@ const extendTopPage = async (doc, now) => {
         cell.classList.add('right');
       }
     }
+    if (!pCodeList.length) row.insertCell();
   }
 
   doc.body.insertBefore(attendanceTable, doc.getElementsByClassName('contents')[0].nextSibling);
+}
+
+/* トップページを拡張する */
+const extendTopPage = async (doc, now) => {
+  await appendAllMembersSummary(doc, now);
+
+  const lastMonth = Object.assign({}, now);
+  lastMonth.month--;
+  await appendAllMembersSummary(doc, lastMonth);
 }
 
 /* 画面に応じて処理分岐 */
@@ -887,75 +863,15 @@ const steering = async () => {
     throw err;
   });
 
-  const form = document.forms['login/loginForm'];
   const mainFrame = parent.view;
   const menuFrame = parent.menu;
 
-  if (form) {
-    funcs.loginForm(form);
-  } else if (mainFrame && menuFrame) {
+  if (mainFrame && menuFrame) {
     funcs.mainContent(mainFrame, menuFrame);
   }
 }
 
 const funcs = {};
-
-/* ログインページ */
-funcs.loginForm = async (form) => {
-  const elements = form.elements;
-  let userIDForm, passwordForm;
-  const indicator = new Indicator();
-
-  indicator.show();
-  // ページオープン時にログイン情報が残っていたらログアウトする
-  const userInfo = await getChromeStorage('local', ['user', 'token']);
-  if (userInfo.user && userInfo.token) {
-    await runtimeSendMessage({
-      action: 'logout',
-      values: {id: userInfo.user},
-    });
-  }
-  indicator.hide();
-
-  // Login hook
-  let preventEvent = true;
-  form.addEventListener('submit', async (e) => {
-    if (!preventEvent) return;
-
-    e.preventDefault();
-    indicator.show();
-
-    const target = e.target;
-    const utf8arr = CryptoJS.enc.Utf8.parse(passwordForm.value);
-    const hash = CryptoJS.SHA256(utf8arr);
-    const passwordHash = CryptoJS.enc.Base64.stringify(hash);
-
-    const response = await runtimeSendMessage({
-      action: 'login',
-      values: {
-        id: userIDForm.value,
-        password: passwordHash,
-      },
-    });
-
-    response.rawPassword = passwordForm.value;
-    await setChromeStorage('local', response);
-
-    preventEvent = false;
-    form.submit();
-  });
-
-  for (let element of elements) {
-    const type = element.type;
-
-    if (type === 'text') {
-      userIDForm = element;
-    }
-    if (type === 'password') {
-      passwordForm = element;
-    }
-  }
-}
 
 /* メインページ */
 funcs.mainContent = (view, menu) => {
@@ -968,39 +884,6 @@ funcs.mainContent = (view, menu) => {
     month: n.getMonth() + 1,
     day: n.getDate(),
   };
-
-  // menu frame
-  menu.frameElement.addEventListener('load', (e) => {
-    const doc = e.target.contentWindow.document;
-
-    // Logout hook
-    const logoutElement = doc.getElementsByClassName('logout')[0];
-    logoutElement.addEventListener('click', async (event) => {
-      // ログアウトをキャンセル
-      event.preventDefault();
-
-      indicator.show();
-      const items = await getChromeStorage('local', ['user']);
-      await runtimeSendMessage({
-        action: 'logout',
-        values: {
-          id: items.user
-        },
-      });
-      // Logout したら storage をクリアする
-      await runtimeSendMessage({
-        action: 'setBadge',
-        values: {
-          type: 'clear',
-        },
-      });
-      chrome.storage.local.clear(() => {
-        // ログアウト実行
-        const href = event.target.getAttribute('href');
-        location.href = href;
-      });
-    });
-  });
 
   // view frame
   view.frameElement.addEventListener('load', async (e) => {

@@ -1,7 +1,7 @@
 {
   "name": "Alpha Attendance Client",
   "description": "Alpha systems inc. の勤怠管理システムと alpha-attendance-api を連携させるクライアントです。",
-  "version": "0.1",
+  "version": "0.2",
   "manifest_version": 2,
   "permissions": [
     "tabs",
@@ -15,16 +15,26 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://wg.alpha.co.jp/sslvpn/portal.html"],
-      "run_at": "document_end",
+      "matches": ["https://wg.alpha.co.jp/sslvpn/portal.html*"],
+      "run_at": "document_idle",
       "css": ["css/portal.css"],
-      "js": ["js/content/overwrite-trasform_url.js", "js/common/chrome-api-promise.js", "js/common/status.js", "js/content/portal.js"]
+      "js": [
+        "js/content/overwrite-trasform_url.js",
+        "js/common/chrome-api-promise.js",
+        "js/common/status.js",
+        "js/content/portal.js"
+      ]
     },
     {
       "matches": ["https://wg.alpha.co.jp/proxy/https/kinpo.alpha.co.jp/kinmu/*"],
-      "run_at": "document_idle",
+      "run_at": "document_end",
       "css": ["css/attendance.css"],
-      "js": ["lib/crypto-js.js", "lib/moment.js", "js/content/content.js"]
+      "js": [
+        "lib/crypto-js.js",
+        "lib/moment.js",
+        "js/common/chrome-api-promise.js",
+        "js/content/kinmu.js"
+      ]
     },
     {
       "matches": ["https://wg.alpha.co.jp/proxy/https/kinpo.alpha.co.jp/kinmu/faces/ui/servTypeTimeTable*"],
@@ -34,7 +44,13 @@
     }
   ],
   "background": {
-    "scripts": ["js/common/chrome-api-promise.js", "js/common/badge.js", "js/background/index.js"],
+    "scripts": [
+      "js/common/status.js",
+      "js/common/chrome-api-promise.js",
+      "js/common/badge.js",
+      "js/background/request.js",
+      "js/background/index.js"
+    ],
     "persistent": false
   },
   "browser_action": {
